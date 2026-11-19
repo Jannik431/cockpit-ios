@@ -66,13 +66,47 @@ enum PreviewData {
             calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)!
         }
         return [
-            HealthWorkout(healthID: UUID(), day: day, start: at(12, 10), end: at(13, 15),
+            HealthWorkout(healthID: gymWorkoutID, day: day, start: at(12, 10), end: at(13, 15),
                           activityTypeRaw: 50, activityTypeName: "Krafttraining", sourceBundleID: "com.example.tracker"),
             HealthWorkout(healthID: UUID(), day: day, start: at(19, 0), end: at(19, 42),
                           activityTypeRaw: 3000, activityTypeName: "Andere", sourceBundleID: "com.example.tracker"),
             HealthWorkout(healthID: UUID(), day: day, start: at(19, 55), end: at(20, 35),
                           activityTypeRaw: 3000, activityTypeName: "Andere", sourceBundleID: "com.example.tracker"),
         ]
+    }
+
+    private static let gymWorkoutID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+    /// The gym session already has an RPE; the handball session does not.
+    static func sessions(on now: Date, calendar: Calendar = .current) -> [CompletedSession] {
+        let gym = workouts(on: now, calendar: calendar)[0]
+        let session = CompletedSession(day: gym.day, start: gym.start, end: gym.end, kind: .gym,
+                                       durationMin: 65, workoutIDs: [gymWorkoutID])
+        session.sessionRPE = 6
+        return [session]
+    }
+
+    /// Morning check-ins with Zepp RMSSD for the last weeks; today's morning is complete.
+    static func entries(endingAt now: Date, count: Int = 25, calendar: Calendar = .current) -> [QuestionnaireEntry] {
+        LocalDay.window(endingAt: now, count: count, calendar: calendar).enumerated().map { index, day in
+            let i = Double(index)
+            let isToday = index == count - 1
+            let entry = QuestionnaireEntry(day: day, phase: .morning, now: now)
+            entry.save(answers: [
+                "sleep_quality": .int(isToday ? 4 : 5),
+                "energy": .int(isToday ? 4 : 5),
+                "muscle_soreness": .int(5),
+                "stress": .int(5),
+                "training_motivation": .int(6),
+                "illness": .int(0),
+                "pain_knee_morning": .int(isToday ? 2 : 1),
+                "pain_shoulder_morning": .int(0),
+                "pain_back_morning": .int(0),
+                "pain_elbow_morning": .int(0),
+                "hrv_rmssd_zepp": .double(isToday ? 38 : (44 * exp(0.12 * sin(i * 1.1))).rounded()),
+            ], note: nil, now: now)
+            return entry
+        }
     }
 }
 #endif

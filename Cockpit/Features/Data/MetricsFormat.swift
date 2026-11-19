@@ -22,7 +22,7 @@ nonisolated enum MetricsFormat {
     static func value(_ value: Double?, for metric: BaselineMetric) -> String {
         switch metric {
         case .sleep: minutes(value.map { Int($0.rounded()) })
-        case .hrv: hrv(value)
+        case .hrv, .zeppRMSSD: hrv(value)
         case .restingHR: bpm(value)
         }
     }
@@ -43,7 +43,7 @@ nonisolated enum MetricsFormat {
             return hours > 0
                 ? [ValuePart(number: "\(hours)", unit: "h"), ValuePart(number: "\(rest)", unit: "min")]
                 : [ValuePart(number: "\(rest)", unit: "min")]
-        case .hrv:
+        case .hrv, .zeppRMSSD:
             return [ValuePart(number: ExplorerFormat.number(value), unit: "ms")]
         case .restingHR:
             return [ValuePart(number: ExplorerFormat.number(value, digits: 0), unit: "bpm")]
@@ -56,7 +56,7 @@ nonisolated enum MetricsFormat {
         let magnitude = abs(difference)
         switch metric {
         case .sleep: return sign + ExplorerFormat.duration(minutes: magnitude)
-        case .hrv: return "\(sign)\(ExplorerFormat.number(magnitude)) ms"
+        case .hrv, .zeppRMSSD: return "\(sign)\(ExplorerFormat.number(magnitude)) ms"
         case .restingHR: return "\(sign)\(ExplorerFormat.number(magnitude, digits: 0)) bpm"
         }
     }

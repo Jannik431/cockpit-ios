@@ -19,7 +19,7 @@ struct MetricTileModel: Identifiable {
 
     static func tiles(on day: Date, from all: [DailyMetrics], calendar: Calendar = .current) -> [MetricTileModel] {
         let days = LocalDay.window(endingAt: day, count: chartDayCount, calendar: calendar)
-        return BaselineMetric.allCases.map { metric in
+        return BaselineMetric.dailyCard.map { metric in
             let values = DailyMetrics.values(for: metric, from: all)
             let assessment = BaselineCalculator.assess(metric, on: day, values: values, calendar: calendar)
             var impacts: [Date: Impact] = [:]
@@ -109,6 +109,8 @@ struct TileFooter: View {
 struct MetricTile: View {
     let model: MetricTileModel
     var detail: String?
+    /// Extra metric shown below, e.g. the Zepp RMSSD in the HRV tile.
+    var secondary: MetricAssessment?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -124,10 +126,41 @@ struct MetricTile: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            if let secondary, secondary.value != nil || secondary.norm != nil {
+                Divider()
+                SecondaryMetricRow(assessment: secondary)
+            }
         }
         .card()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText(for: model.assessment))
+    }
+}
+
+/// Compact line for a second, separately normed metric.
+struct SecondaryMetricRow: View {
+    let assessment: MetricAssessment
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Circle()
+                    .fill(assessment.impact?.tint ?? .gray)
+                    .frame(width: 7, height: 7)
+                Text(assessment.metric.shortTitle)
+                    .font(.subheadline.weight(.medium))
+                Spacer(minLength: 8)
+                Text(MetricsFormat.value(assessment.value, for: assessment.metric))
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+            }
+            Text(MetricsFormat.assessmentLine(assessment) + " · eingetragen im Morgen-Check")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 15)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

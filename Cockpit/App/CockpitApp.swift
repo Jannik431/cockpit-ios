@@ -7,6 +7,6 @@ struct CockpitApp: App {
         WindowGroup {
             DashboardView()
         }
-        .modelContainer(for: [DailyMetrics.self, HealthWorkout.self])
+        .modelContainer(Persistence.container)
     }
 }

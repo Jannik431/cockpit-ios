@@ -5,17 +5,23 @@ nonisolated enum BaselineMetric: String, CaseIterable, Sendable {
     case sleep
     case hrv
     case restingHR
+    /// Entered by hand from the Zepp app (morning check). Never mixed with `hrv` (SDNN).
+    case zeppRMSSD
+
+    /// Metrics with their own tile on the daily card.
+    static let dailyCard: [BaselineMetric] = [.sleep, .hrv, .restingHR]
 
     var title: String {
         switch self {
         case .sleep: "Schlaf"
         case .hrv: HRVMetric.title
         case .restingHR: "Ruhepuls"
+        case .zeppRMSSD: "HRV laut Zepp (RMSSD)"
         }
     }
 
     /// HRV is roughly log-normal, so its spread and z-score are computed on ln(value).
-    var usesLogScale: Bool { self == .hrv }
+    var usesLogScale: Bool { self == .hrv || self == .zeppRMSSD }
 
     /// Direction that counts as favourable for the colour coding: more sleep, higher HRV, lower resting HR.
     var higherIsFavorable: Bool { self != .restingHR }

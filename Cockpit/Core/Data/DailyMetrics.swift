@@ -39,6 +39,7 @@ final class DailyMetrics {
         case .sleep: asleepMin.map(Double.init)
         case .hrv: hrvNightMeanMs
         case .restingHR: restingHR
+        case .zeppRMSSD: nil
         }
     }
 
@@ -51,7 +52,7 @@ final class DailyMetrics {
 
     /// Baseline assessments for `day`, computed from all given days.
     static func assessments(on day: Date, from all: [DailyMetrics]) -> [MetricAssessment] {
-        BaselineMetric.allCases.map { metric in
+        BaselineMetric.dailyCard.map { metric in
             BaselineCalculator.assess(metric, on: day, values: values(for: metric, from: all))
         }
     }

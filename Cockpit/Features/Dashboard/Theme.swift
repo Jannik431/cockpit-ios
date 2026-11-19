@@ -14,7 +14,7 @@ extension BaselineMetric {
     var systemImage: String {
         switch self {
         case .sleep: "bed.double.fill"
-        case .hrv: "waveform.path.ecg"
+        case .hrv, .zeppRMSSD: "waveform.path.ecg"
         case .restingHR: "heart.fill"
         }
     }
@@ -22,7 +22,7 @@ extension BaselineMetric {
     var accent: Color {
         switch self {
         case .sleep: .indigo
-        case .hrv: .teal
+        case .hrv, .zeppRMSSD: .teal
         case .restingHR: .pink
         }
     }
@@ -33,6 +33,7 @@ extension BaselineMetric {
         case .sleep: "Schlaf"
         case .hrv: "HRV"
         case .restingHR: "Ruhepuls"
+        case .zeppRMSSD: "Zepp (RMSSD)"
         }
     }
 }
