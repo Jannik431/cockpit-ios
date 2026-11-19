@@ -51,8 +51,10 @@ nonisolated enum QuestionCatalog {
     static let version = 1
 
     static let painRegions: [(id: String, title: String)] = [
-        ("knee", "Knie"),
-        ("shoulder", "Schulter"),
+        ("knee_left", "Knie links"),
+        ("knee_right", "Knie rechts"),
+        ("shoulder_left", "Schulter links"),
+        ("shoulder_right", "Schulter rechts"),
         ("back", "Rücken"),
         ("elbow", "Ellenbogen"),
     ]
@@ -83,8 +85,9 @@ nonisolated enum QuestionCatalog {
                  kind: .number(unit: "kg", range: 30...200), optional: true),
     ]
 
-    static let evening: [Question] = [
-        Question(id: "pain_knee_evening", phase: .evening, section: "Beschwerden abends", title: "Knie", kind: .pain),
+    static let evening: [Question] = painRegions.map { region in
+        Question(id: "pain_\(region.id)_evening", phase: .evening, section: "Beschwerden abends", title: region.title, kind: .pain)
+    } + [
         Question(id: "food_amount", phase: .evening, section: "Ernährung", title: "Gegessen",
                  kind: .choice(["zu wenig", "passt", "zu viel"])),
         Question(id: "protein_ok", phase: .evening, section: "Ernährung", title: "Genug Eiweiß", kind: .yesNo),

@@ -24,7 +24,8 @@ struct DashboardView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @State private var sync = HealthSync()
+    @State private var sync = HealthSync.shared
+    @State private var router = NotificationRouter.shared
     @State private var path: [Route] = []
     @State private var sheet: ActiveSheet?
     @State private var now = Date.now
@@ -79,11 +80,26 @@ struct DashboardView: View {
                 case .session(let draft): SessionLogView(draft: draft)
                 }
             }
-            .task { await refresh() }
+            .task {
+                await refresh()
+                await ReminderCenter.shared.requestAuthorizationIfNeeded()
+                await ReminderCenter.shared.refresh(context: context, inForeground: true)
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     Task { await refresh() }
                 }
+            }
+            .onChange(of: sheet == nil) { _, closed in
+                // A saved check-in or session changes which reminders are still needed.
+                if closed {
+                    Task { await ReminderCenter.shared.refresh(context: context, inForeground: true) }
+                }
+            }
+            .onChange(of: router.pendingRoute, initial: true) { _, route in
+                guard let route else { return }
+                router.pendingRoute = nil
+                open(route)
             }
         }
     }
@@ -91,6 +107,27 @@ struct DashboardView: View {
     private func refresh() async {
         now = .now
         await sync.run(context: context)
+        await ReminderCenter.shared.refresh(context: context, inForeground: scenePhase == .active)
+    }
+
+    /// Opens what a tapped notification points to.
+    private func open(_ route: String) {
+        now = .now
+        path = []
+        switch route {
+        case ReminderRoute.morning, ReminderRoute.weighIn:
+            sheet = .checkIn(.morning)
+        case ReminderRoute.evening:
+            sheet = .checkIn(.evening)
+        default:
+            guard route.hasPrefix(ReminderRoute.sessionPrefix) else { return }
+            let key = String(route.dropFirst(ReminderRoute.sessionPrefix.count))
+            let recent = workouts.filter { $0.end >= now.addingTimeInterval(-36 * 3600) }
+            guard let session = WorkoutGrouping.sessions(from: recent.map(\.info)).first(where: { $0.workoutIDs.first?.uuidString == key })
+            else { return }
+            let log = sessions.first { $0.matches(session) }
+            sheet = .session(SessionDraft(day: LocalDay.start(of: session.start), suggested: session, existing: log))
+        }
     }
 }
 

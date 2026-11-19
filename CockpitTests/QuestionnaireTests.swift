@@ -9,6 +9,13 @@ struct QuestionCatalogTests {
         #expect(Set(ids).count == ids.count)
     }
 
+    @Test func everyPainRegionIsAskedMorningAndEvening() {
+        for region in QuestionCatalog.painRegions {
+            #expect(QuestionCatalog.question("pain_\(region.id)_morning")?.kind == .pain)
+            #expect(QuestionCatalog.question("pain_\(region.id)_evening")?.kind == .pain)
+        }
+    }
+
     @Test func conditionsPointToYesNoQuestionsOfTheSamePhase() {
         for question in QuestionCatalog.questions {
             guard let parentID = question.shownIfYes else { continue }
@@ -39,9 +46,9 @@ struct QuestionCatalogTests {
 
     @Test func caffeineTimeIsOnlyRequiredAfterYes() {
         var answers: [String: AnswerValue] = [
-            "pain_knee_evening": .int(0), "food_amount": .int(1), "protein_ok": .bool(true),
-            "caffeine_today": .bool(false), "alcohol_drinks": .int(0),
+            "food_amount": .int(1), "protein_ok": .bool(true), "caffeine_today": .bool(false), "alcohol_drinks": .int(0),
         ]
+        for region in QuestionCatalog.painRegions { answers["pain_\(region.id)_evening"] = .int(0) }
         #expect(QuestionCatalog.missing(answers, phase: .evening).isEmpty)
         answers["caffeine_today"] = .bool(true)
         #expect(QuestionCatalog.missing(answers, phase: .evening).map(\.id) == ["last_caffeine_time"])

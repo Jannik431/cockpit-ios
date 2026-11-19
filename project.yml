@@ -25,6 +25,7 @@ targets:
       path: Cockpit/Cockpit.entitlements
       properties:
         com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.background-delivery: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.jannikpasch.cockpit

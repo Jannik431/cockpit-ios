@@ -5,6 +5,9 @@ import SwiftData
 /// Runs the Apple Health import when the app starts or comes back to the foreground.
 @Observable
 final class HealthSync {
+    /// Shared by the dashboard and the background observer, so two imports never run at the same time.
+    static let shared = HealthSync()
+
     enum State: Equatable {
         case idle
         case unavailable

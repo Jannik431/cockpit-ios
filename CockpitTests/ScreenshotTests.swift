@@ -36,10 +36,10 @@ struct ScreenshotTests {
     func morningCheckControls() throws {
         let answers: [String: AnswerValue] = [
             "sleep_quality": .int(5), "energy": .int(4), "illness": .int(0),
-            "pain_knee_morning": .int(2), "hrv_rmssd_zepp": .double(42),
+            "pain_knee_right_morning": .int(2), "hrv_rmssd_zepp": .double(42),
         ]
         let questions = QuestionCatalog.questions(for: .morning).filter {
-            ["sleep_quality", "energy", "illness", "pain_knee_morning", "hrv_rmssd_zepp"].contains($0.id)
+            ["sleep_quality", "energy", "illness", "pain_knee_right_morning", "hrv_rmssd_zepp"].contains($0.id)
         }
         let view = VStack(spacing: 12) {
             ForEach(questions) { question in

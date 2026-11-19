@@ -29,6 +29,7 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 | 📊 | **Daily card:** last night's sleep as a hypnogram with minutes per stage; HRV and resting heart rate over the last 10 days with the norm range as a band (gaps stay gaps); today's training. Deviations are coloured green/yellow/orange by their likely effect, and the method is explained in the app. | ✅ Done |
 | 📝 | **Check-ins:** morning (wellbeing scales based on the Hooper index, illness, pain per body region, optional weight and tracker HRV) and evening (pain, nutrition, caffeine, alcohol). Versioned question catalog with stable IDs, conditional follow-ups, missing answers stay `null`. | ✅ Done |
 | 🏋️ | **Session RPE:** Borg CR10 per session (prompted 30 min after a workout ends), session load = RPE × duration, handball match/practice and throwing volume | ✅ Done |
+| 🔔 | **Reminders:** local notifications for the morning check, weigh-in days and the evening check, skipped once done. HealthKit background delivery wakes the app when a new workout arrives and schedules the RPE prompt. Tapping a notification opens the right form. | ✅ Done |
 | 📤 | **Weekly report:** versioned JSON + Markdown export | 🚧 Next |
 | 📅 | Import of the planned training week (CSV), session RPE, configurable rule hints | Phase 2 |
 
@@ -58,6 +59,7 @@ Cockpit/
     Data/              SwiftData models, versioned schema
     Health/            HealthKit access, import, sync
     Questionnaire/     Versioned question catalog and answer values
+    Reminders/         Notification planning (unit-tested) and scheduling
     Metrics/           Pure logic: daily values, baselines, workout grouping (unit-tested)
   Features/
     Dashboard/         Daily card and sync status

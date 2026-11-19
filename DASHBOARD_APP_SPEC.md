@@ -108,13 +108,15 @@ Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöh
 |---|---|---|
 | Morgen-Check | `sleep_quality`, `energy`, `muscle_soreness`, `stress`, `training_motivation` | 1–7, höher = besser |
 | | `illness` | keine / leichte / krank |
-| | `pain_<region>_morning` für Knie, Schulter, Rücken, Ellenbogen | 0–10 (NRS), Schnellwahl „Keine Beschwerden“ |
+| | `pain_<region>_morning` für Knie links/rechts, Schulter links/rechts, Rücken, Ellenbogen | 0–10 (NRS), Schnellwahl „Keine Beschwerden“ |
 | | `hrv_rmssd_zepp` (optional), `body_weight` (optional, Wiegetage Mo/Mi/Fr) | ms, kg |
-| Abend-Check (ab 17 Uhr) | `pain_knee_evening` | 0–10 |
+| Abend-Check (ab 17 Uhr) | `pain_<region>_evening` für dieselben Regionen | 0–10 |
 | | `food_amount`, `protein_ok`, `caffeine_today` → `last_caffeine_time`, `alcohol_drinks` | Auswahl, ja/nein, Uhrzeit, Anzahl |
 | Pro Einheit | Session-RPE, Dauer, bei Handball Spiel/Training und Wurfvolumen | Borg CR10 0–10; kaum/wenig/mittel/viel |
 
-- **Timing:** Die Tageskarte zeigt Morgen- und Abend-Check mit Status. Eine Einheit aus Apple Health, die vor mindestens 30 Minuten geendet hat und noch kein RPE hat, erscheint oben als Hinweis (In-App statt Push; Push-Erinnerungen folgen).
+- **Timing:** Die Tageskarte zeigt Morgen- und Abend-Check mit Status. Eine Einheit aus Apple Health, die vor mindestens 30 Minuten geendet hat und noch kein RPE hat, erscheint oben als Hinweis.
+- **Push-Erinnerungen** (lokal, `ReminderPlanner`): Morgen-Check 9:00, Wiegen Mo/Mi/Fr 8:30, Abend-Check 22:30. Sie werden 14 Tage im Voraus geplant, bei jedem App-Start und nach jedem gespeicherten Bogen neu berechnet und entfallen, wenn der Check schon erledigt bzw. das Gewicht eingetragen ist. Antippen öffnet den passenden Bogen.
+- **RPE bei Eingang der Einheit:** HealthKit-Hintergrundzustellung (`HKObserverQuery`, Entitlement `healthkit.background-delivery`, funktioniert mit dem kostenlosen Account). Kommt ein neues Workout in Apple Health an, importiert die App im Hintergrund und plant eine Erinnerung 30 Minuten nach Ende der Einheit (bei später Synchronisierung sofort, aber nur einmal). Bei Handball fragt sie Session-RPE und Wurfvolumen ab. Wann iOS die App weckt, entscheidet das System; bei gesperrtem iPhone kann es sich verzögern.
 - **Speicherung:** `QuestionnaireEntry` (Tag, Phase, Katalog-Version, Antworten als JSON) und `CompletedSession` (bestätigte Art, Dauer, RPE, Last = RPE × Dauer, verknüpfte Workout-IDs). Ab hier gibt es ein versioniertes SwiftData-Schema mit Migrationsplan; der alte, unversionierte Speicher (nur Health-Daten) wird einmalig neu angelegt und neu importiert.
 - **Zepp-RMSSD** bekommt ab 14 Werten eine eigene Norm und erscheint als eigene Zeile in der HRV-Kachel, nie vermischt mit SDNN.
 
