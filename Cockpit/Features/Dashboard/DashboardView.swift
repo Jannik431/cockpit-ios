@@ -4,12 +4,26 @@ import SwiftUI
 struct DashboardView: View {
     var body: some View {
         NavigationStack {
-            ContentUnavailableView(
-                "Noch keine Daten",
-                systemImage: "heart.text.square",
-                description: Text("Als Nächstes kommt der Health Explorer. Er zeigt, welche Werte dein Tracker an Apple Health liefert.")
-            )
+            ContentUnavailableView {
+                Label("Noch keine Tageskarte", systemImage: "heart.text.square")
+            } description: {
+                Text("Zuerst prüft der Health Explorer, welche Werte dein Tracker an Apple Health liefert.")
+            } actions: {
+                NavigationLink("Health Explorer öffnen") {
+                    HealthExplorerView()
+                }
+                .buttonStyle(.borderedProminent)
+            }
             .navigationTitle("Heute")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        HealthExplorerView()
+                    } label: {
+                        Label("Health Explorer", systemImage: "stethoscope")
+                    }
+                }
+            }
         }
     }
 }
