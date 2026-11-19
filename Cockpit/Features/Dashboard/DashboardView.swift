@@ -12,11 +12,11 @@ struct DashboardView: View {
         NavigationStack {
             List {
                 Section {
-                    LastNightView(metrics: today)
+                    LastNightView(metrics: today, assessments: DailyMetrics.assessments(on: .now, from: days))
                 } header: {
                     Text("Letzte Nacht")
                 } footer: {
-                    Text("Rohwerte. Der Vergleich mit deiner Norm kommt mit der Tageskarte.")
+                    BaselineMethodFooter()
                 }
 
                 Section("Apple Health") {
@@ -57,18 +57,29 @@ struct DashboardView: View {
 
 private struct LastNightView: View {
     let metrics: DailyMetrics?
+    let assessments: [MetricAssessment]
 
     var body: some View {
         if let metrics, metrics.asleepMin != nil || metrics.hrvNightMeanMs != nil || metrics.restingHR != nil {
-            LabeledContent("Schlaf", value: MetricsFormat.minutes(metrics.asleepMin))
-            if let start = metrics.inBedStart, let end = metrics.inBedEnd {
-                LabeledContent("Im Bett", value: MetricsFormat.timeRange(start, end))
+            ForEach(assessments, id: \.metric) { assessment in
+                AssessmentRow(assessment: assessment, detail: detail(for: assessment.metric, metrics: metrics))
             }
-            LabeledContent(HRVMetric.title, value: MetricsFormat.hrv(metrics.hrvNightMeanMs, count: metrics.hrvSamples.count))
-            LabeledContent("Ruhepuls", value: MetricsFormat.bpm(metrics.restingHR))
         } else {
             Text("Für heute sind noch keine Werte da. Vielleicht hat die Tracker-App noch nicht mit Apple Health synchronisiert.")
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func detail(for metric: BaselineMetric, metrics: DailyMetrics) -> String? {
+        switch metric {
+        case .sleep:
+            guard let start = metrics.inBedStart, let end = metrics.inBedEnd else { return nil }
+            return "Im Bett \(MetricsFormat.timeRange(start, end))"
+        case .hrv:
+            let count = metrics.hrvSamples.count
+            return count > 0 ? "Mittel aus \(count) \(count == 1 ? "Wert" : "Werten") der Nacht" : nil
+        case .restingHR:
+            return nil
         }
     }
 }

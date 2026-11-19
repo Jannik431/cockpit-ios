@@ -76,6 +76,13 @@ Zu lesende Typen: `sleepAnalysis`, `heartRateVariabilitySDNN`, `restingHeartRate
 - Fehlende Werte sichtbar machen, nie still interpolieren
 - Ampelfarben nur mit transparenter Schwelle, keine medizinische Bewertung
 
+**Umgesetzt** (`BaselineCalculator`, alle Konstanten an einer Stelle und in der App erklärt):
+- **Norm:** Median der 30 Tage *vor* dem Tag (der Tag selbst zählt nicht mit), ab 14 vorhandenen Werten
+- **Kurzfristig:** Median der letzten 7 Tage *inklusive* des Tages, ab 4 Werten, als Trend gegen die Norm
+- **Abweichung:** Differenz in der Einheit der Metrik und robuster z-Wert `(x − Median) / (1,4826 × MAD)`; HRV auf ln-Skala
+- **Einordnung:** |z| < 1 im Normbereich, 1 ≤ |z| < 2 leicht, |z| ≥ 2 deutlich über/unter der Norm; MAD = 0 → „keine Streuung“, kein z
+- Fehlende Tage zählen als fehlend (`x von 30`), es wird nichts aufgefüllt
+
 ---
 
 ## 5. Fragebogen

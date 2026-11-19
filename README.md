@@ -2,7 +2,7 @@
 
 A personal iOS training dashboard that reads sleep, heart rate variability and resting heart rate from Apple Health, compares them against your **own** baseline, and exports clean, versioned weekly reports for training planning.
 
-> **Status:** Phase 1 in progress. The Health Explorer and the Apple Health import are done; baselines, the daily card, questionnaire and export are next. See the [roadmap](#roadmap).
+> **Status:** Phase 1 in progress. The Health Explorer, the Apple Health import and personal baselines are done; the daily card, questionnaire and export are next. See the [roadmap](#roadmap).
 
 ## Why
 
@@ -18,7 +18,8 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 |---|---|---|
 | 🔍 | **Health Explorer:** shows which Apple Health data actually arrives, from which source and device, how often, at what time of day, and where the gaps are. Exports a Markdown summary. | ✅ Done |
 | 📥 | **Apple Health import:** 90 days of history on first launch, then incremental with a 3-day overlap for late syncs. Per wake day: sleep window and stages, raw nightly HRV samples plus their mean, resting heart rate. Workouts are de-duplicated by HealthKit UUID and grouped into suggested sessions. | ✅ Done |
-| 📊 | **Daily card:** sleep, HRV and resting heart rate compared with your personal baseline (median and MAD, at least 14 days of data) | 🚧 Next |
+| 📏 | **Personal baselines:** 30-day norm (median of the days *before*, at least 14 values) and 7-day trend. Deviations as a difference in the metric's unit and as a robust z-score (scaled MAD, HRV on log scale) with transparent thresholds. | ✅ Done |
+| 📊 | **Daily card:** sleep, HRV and resting heart rate at a glance, with their deviation from the norm | 🚧 Next |
 | 📝 | **Wellbeing questionnaire:** fixed core based on the Hooper index plus conditional questions, under 30 seconds a day | 🚧 Next |
 | 📤 | **Weekly report:** versioned JSON + Markdown export | 🚧 Next |
 | 📅 | Import of the planned training week (CSV), session RPE, configurable rule hints | Phase 2 |
@@ -48,7 +49,7 @@ Cockpit/
   Core/
     Data/              SwiftData models
     Health/            HealthKit access, import, sync
-    Metrics/           Pure logic: daily values, workout grouping (unit-tested)
+    Metrics/           Pure logic: daily values, baselines, workout grouping (unit-tested)
   Features/
     Dashboard/         Start screen and sync status
     Data/              Stored days for spot checks
@@ -79,7 +80,7 @@ With a free Apple developer account the signature expires after 7 days. Running 
 
 ## Roadmap
 
-1. **Data and daily card:** HealthKit access ✅, Health Explorer ✅, Apple Health import ✅, baselines with tests, daily card, questionnaire core, JSON export
+1. **Data and daily card:** HealthKit access ✅, Health Explorer ✅, Apple Health import ✅, baselines with tests ✅, daily card, questionnaire core, JSON export
 2. **Plan and report:** CSV import of the training week, session RPE, weekly report JSON + Markdown, rule hints
 3. **Extensions:** gym logging (e1RM, rest timer / Live Activity), spreadsheet sync via API, charts and analyses
 

@@ -9,7 +9,11 @@ struct StoredDaysView: View {
     var body: some View {
         List(days) { metrics in
             NavigationLink {
-                DayDetailView(metrics: metrics, workouts: workouts.filter { $0.day == metrics.day })
+                DayDetailView(
+                    metrics: metrics,
+                    workouts: workouts.filter { $0.day == metrics.day },
+                    assessments: DailyMetrics.assessments(on: metrics.day, from: days)
+                )
             } label: {
                 DayRow(metrics: metrics, workoutCount: workouts.count { $0.day == metrics.day })
             }
@@ -50,10 +54,19 @@ private struct DayRow: View {
 struct DayDetailView: View {
     let metrics: DailyMetrics
     let workouts: [HealthWorkout]
+    let assessments: [MetricAssessment]
 
     var body: some View {
         List {
-            Section("Schlaf") {
+            ForEach(assessments, id: \.metric) { assessment in
+                AssessmentDetailSection(assessment: assessment)
+            }
+            Section {
+            } footer: {
+                BaselineMethodFooter()
+            }
+
+            Section("Schlafphasen") {
                 if let start = metrics.inBedStart, let end = metrics.inBedEnd {
                     LabeledContent("Im Bett", value: MetricsFormat.timeRange(start, end))
                 }

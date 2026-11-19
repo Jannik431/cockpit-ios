@@ -32,6 +32,25 @@ final class DailyMetrics {
         self.fetchedAt = fetchedAt
     }
 
+    func value(for metric: BaselineMetric) -> Double? {
+        switch metric {
+        case .sleep: asleepMin.map(Double.init)
+        case .hrv: hrvNightMeanMs
+        case .restingHR: restingHR
+        }
+    }
+
+    /// Baseline assessments for `day`, computed from all given days.
+    static func assessments(on day: Date, from all: [DailyMetrics]) -> [MetricAssessment] {
+        BaselineMetric.allCases.map { metric in
+            let values = Dictionary(
+                all.compactMap { metrics in metrics.value(for: metric).map { (metrics.day, $0) } },
+                uniquingKeysWith: { first, _ in first }
+            )
+            return BaselineCalculator.assess(metric, on: day, values: values)
+        }
+    }
+
     var hrvSamples: [HRVSample] {
         guard let hrvSamplesJSON else { return [] }
         return (try? JSONDecoder().decode([HRVSample].self, from: hrvSamplesJSON)) ?? []
