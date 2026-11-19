@@ -16,6 +16,41 @@ nonisolated enum BaselineMetric: String, CaseIterable, Sendable {
 
     /// HRV is roughly log-normal, so its spread and z-score are computed on ln(value).
     var usesLogScale: Bool { self == .hrv }
+
+    /// Direction that counts as favourable for the colour coding: more sleep, higher HRV, lower resting HR.
+    var higherIsFavorable: Bool { self != .restingHR }
+}
+
+/// Colour coding of a deviation by its likely effect (user decision, see spec section 4).
+/// Orientation only, not a medical assessment.
+nonisolated enum Impact: String, Sendable {
+    /// Within the norm or deviating in the favourable direction.
+    case good
+    /// Slightly in the unfavourable direction.
+    case caution
+    /// Clearly in the unfavourable direction.
+    case warning
+    /// Cannot be judged (no spread in the norm).
+    case unknown
+
+    init(_ deviation: Deviation, metric: BaselineMetric) {
+        let favorableUp = metric.higherIsFavorable
+        switch deviation.band {
+        case .withinNorm: self = .good
+        case .undetermined: self = .unknown
+        case .slightlyAbove: self = favorableUp ? .good : .caution
+        case .clearlyAbove: self = favorableUp ? .good : .warning
+        case .slightlyBelow: self = favorableUp ? .caution : .good
+        case .clearlyBelow: self = favorableUp ? .warning : .good
+        }
+    }
+}
+
+extension MetricAssessment {
+    var impact: Impact? {
+        guard case .available(let deviation) = status else { return nil }
+        return Impact(deviation, metric: metric)
+    }
 }
 
 /// Median and spread of one metric over a window of local days.
@@ -165,6 +200,16 @@ nonisolated enum BaselineCalculator {
         }
         let z = distance / spread
         return Deviation(value: value, difference: difference, z: z, band: band(for: z))
+    }
+
+    /// The value range that counts as "within norm" (|z| < `notableZ`), in the metric's own unit.
+    static func normRange(_ norm: Baseline, logScale: Bool) -> ClosedRange<Double> {
+        let spread = notableZ * madScale * norm.mad
+        if logScale {
+            let center = Foundation.log(norm.median)
+            return exp(center - spread)...exp(center + spread)
+        }
+        return (norm.median - spread)...(norm.median + spread)
     }
 
     /// |z| < 1: within norm · 1 ≤ |z| < 2: slight · |z| ≥ 2: clear.

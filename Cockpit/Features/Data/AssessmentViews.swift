@@ -1,25 +1,5 @@
 import SwiftUI
 
-/// Value plus a one-line comparison with the norm.
-struct AssessmentRow: View {
-    let assessment: MetricAssessment
-    var detail: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            LabeledContent(assessment.metric.title, value: MetricsFormat.value(assessment.value, for: assessment.metric))
-            Text(MetricsFormat.assessmentLine(assessment))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            if let detail {
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
 /// Full transparency for one metric: windows, counts, median, MAD, z and short-term trend.
 struct AssessmentDetailSection: View {
     let assessment: MetricAssessment

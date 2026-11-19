@@ -53,7 +53,7 @@ Zu lesende Typen: `sleepAnalysis`, `heartRateVariabilitySDNN`, `restingHeartRate
 | Typ | Befund | Konsequenz |
 |---|---|---|
 | Schlaf | Eine Quelle; Phasen (Kern/Tief/REM/Wach) und genau ein „Im Bett“-Eintrag pro Nacht | Längster „Im Bett“-Eintrag pro Aufwach-Tag ist die Nacht; Phasen zählen per Mittelpunkt dazu; Nickerchen werden ignoriert |
-| HRV | ~3 Werte pro Nacht. Die Tracker-App zeigt **RMSSD**, in Health steht **SDNN**; die Zahlen weichen ab | Eigene Metrik `healthkit_sdnn`, nie mit Werten aus der Tracker-App mischen; Rohwerte der Nacht speichern, Nachtmittel daraus |
+| HRV | ~3 Werte pro Nacht. Die Tracker-App zeigt **RMSSD**, in Health steht **SDNN**; die Zahlen weichen ab. Apple Health hat keinen RMSSD-Typ, und der Hersteller bietet keine öffentliche API | Eigene Metrik `healthkit_sdnn`, nie mit Werten aus der Tracker-App mischen; Rohwerte der Nacht speichern, Nachtmittel daraus |
 | Ruhepuls | Ein Wert pro Tag, Zeitstempel ist ein Datumsstempel (00:00, in der Sommerzeit 01:00) | Zuordnung nach Kalendertag |
 | Herzfrequenz | Mehrere tausend Werte pro Tag, im Training dichter | Wird nicht importiert; bei Bedarf später gezielt pro Workout |
 | Workouts | Typen brauchbar: Krafttraining = Gym, „Andere“ (automatische Erkennung) = Handball; Spiele werden teils in mehrere Workouts geteilt | Typ nur als Vorschlag; gleiche Art mit < 30 min Abstand = eine Einheit |
@@ -82,6 +82,12 @@ Zu lesende Typen: `sleepAnalysis`, `heartRateVariabilitySDNN`, `restingHeartRate
 - **Abweichung:** Differenz in der Einheit der Metrik und robuster z-Wert `(x − Median) / (1,4826 × MAD)`; HRV auf ln-Skala
 - **Einordnung:** |z| < 1 im Normbereich, 1 ≤ |z| < 2 leicht, |z| ≥ 2 deutlich über/unter der Norm; MAD = 0 → „keine Streuung“, kein z
 - Fehlende Tage zählen als fehlend (`x von 30`), es wird nichts aufgefüllt
+
+**Tageskarte umgesetzt:**
+- **Schlaf:** Dauer und Abweichung zur Norm, dazu der Nachtverlauf der letzten Nacht als Hypnogramm (Tief/Kern/REM/Wach) mit Minuten je Phase. Die Phasen-Intervalle werden dafür pro Nacht gespeichert.
+- **HRV und Ruhepuls:** Wert, Abweichung und die letzten 10 Tage (30 Tage wirkten zu flach) mit Normbereich als Band und Median gestrichelt. Jeder Punkt ist gegen die Norm seines eigenen Tages eingefärbt; Lücken bleiben Lücken.
+- Darunter das heutige Training aus Apple Health (Art als Vorschlag) und ein Platzhalter für den Fragebogen. Die Methode wird in der App erklärt.
+- **Farben nach Auswirkung** (Entscheidung des Nutzers): grün = Normbereich oder günstige Richtung, gelb = leicht ungünstig, orange = deutlich ungünstig. Günstig: mehr Schlaf, höhere HRV, niedrigerer Ruhepuls. Das ist eine Faustregel zur Orientierung; die App sagt das in der Erklärung auch so. Zahlen bleiben neutral gefärbt (Kontrast), die Farbe steckt in Chip und Punkten.
 
 ---
 

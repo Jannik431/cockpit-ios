@@ -14,6 +14,8 @@ final class DailyMetrics {
     var deepMin: Int?
     var remMin: Int?
     var unspecifiedMin: Int?
+    /// `[SleepSegment]` of the main night. Added in import version 2.
+    var sleepSegmentsJSON: Data?
     var sleepSource: String?
 
     /// Always `HRVMetric.id` when HRV values are present.
@@ -40,20 +42,28 @@ final class DailyMetrics {
         }
     }
 
+    static func values(for metric: BaselineMetric, from all: [DailyMetrics]) -> [Date: Double] {
+        Dictionary(
+            all.compactMap { metrics in metrics.value(for: metric).map { (metrics.day, $0) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
     /// Baseline assessments for `day`, computed from all given days.
     static func assessments(on day: Date, from all: [DailyMetrics]) -> [MetricAssessment] {
         BaselineMetric.allCases.map { metric in
-            let values = Dictionary(
-                all.compactMap { metrics in metrics.value(for: metric).map { (metrics.day, $0) } },
-                uniquingKeysWith: { first, _ in first }
-            )
-            return BaselineCalculator.assess(metric, on: day, values: values)
+            BaselineCalculator.assess(metric, on: day, values: values(for: metric, from: all))
         }
     }
 
     var hrvSamples: [HRVSample] {
         guard let hrvSamplesJSON else { return [] }
         return (try? JSONDecoder().decode([HRVSample].self, from: hrvSamplesJSON)) ?? []
+    }
+
+    var sleepSegments: [SleepSegment] {
+        guard let sleepSegmentsJSON else { return [] }
+        return (try? JSONDecoder().decode([SleepSegment].self, from: sleepSegmentsJSON)) ?? []
     }
 
     func apply(_ values: DailyValues, fetchedAt: Date) {
@@ -65,6 +75,7 @@ final class DailyMetrics {
         deepMin = values.deepMin
         remMin = values.remMin
         unspecifiedMin = values.unspecifiedMin
+        sleepSegmentsJSON = values.sleepSegments.isEmpty ? nil : try? JSONEncoder().encode(values.sleepSegments)
         sleepSource = values.sleepSource
 
         hrvMetric = values.hrvSamples.isEmpty ? nil : HRVMetric.id

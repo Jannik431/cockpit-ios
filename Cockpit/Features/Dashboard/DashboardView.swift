@@ -1,46 +1,60 @@
 import SwiftData
 import SwiftUI
 
-/// Start screen. Shows last night's raw values until the daily card with baselines exists.
+/// Start screen: the daily card plus Apple Health sync.
 struct DashboardView: View {
+    private enum Route: Hashable {
+        case storedDays
+        case explorer
+    }
+
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @State private var sync = HealthSync()
+    @State private var path: [Route] = []
+    @State private var showsMethod = false
     @Query(sort: \DailyMetrics.day, order: .reverse) private var days: [DailyMetrics]
+    @Query(sort: \HealthWorkout.start) private var workouts: [HealthWorkout]
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    LastNightView(metrics: today, assessments: DailyMetrics.assessments(on: .now, from: days))
-                } header: {
-                    Text("Letzte Nacht")
-                } footer: {
-                    BaselineMethodFooter()
-                }
-
-                Section("Apple Health") {
-                    SyncStatusView(sync: sync) {
-                        Task { await sync.requestAccess(context: context) }
-                    } retry: {
-                        Task { await sync.run(context: context) }
-                    }
-                }
-
-                Section("Daten") {
-                    NavigationLink {
-                        StoredDaysView()
+        NavigationStack(path: $path) {
+            ScrollView {
+                DailyCardContent(
+                    now: .now,
+                    days: days,
+                    workouts: workouts,
+                    syncState: sync.state,
+                    lastSync: sync.lastRun,
+                    requestAccess: { Task { await sync.requestAccess(context: context) } },
+                    retry: { Task { await sync.run(context: context) } },
+                    showMethod: { showsMethod = true }
+                )
+                .padding(.horizontal)
+                .padding(.bottom, 24)
+            }
+            .background(Theme.screenBackground)
+            .navigationTitle("Heute")
+            .refreshable { await sync.run(context: context) }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Gespeicherte Tage", systemImage: "calendar") { path.append(.storedDays) }
+                        Button("Health Explorer", systemImage: "stethoscope") { path.append(.explorer) }
                     } label: {
-                        LabeledContent("Gespeicherte Tage", value: "\(days.count)")
-                    }
-                    NavigationLink("Health Explorer") {
-                        HealthExplorerView()
+                        Label("Daten", systemImage: "ellipsis.circle")
                     }
                 }
             }
-            .navigationTitle("Heute")
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .storedDays: StoredDaysView()
+                case .explorer: HealthExplorerView()
+                }
+            }
+            .sheet(isPresented: $showsMethod) {
+                MethodSheet()
+            }
             .task { await sync.run(context: context) }
-            .refreshable { await sync.run(context: context) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     Task { await sync.run(context: context) }
@@ -48,79 +62,23 @@ struct DashboardView: View {
             }
         }
     }
-
-    private var today: DailyMetrics? {
-        let start = LocalDay.start(of: .now)
-        return days.first { $0.day == start }
-    }
 }
 
-private struct LastNightView: View {
-    let metrics: DailyMetrics?
-    let assessments: [MetricAssessment]
-
-    var body: some View {
-        if let metrics, metrics.asleepMin != nil || metrics.hrvNightMeanMs != nil || metrics.restingHR != nil {
-            ForEach(assessments, id: \.metric) { assessment in
-                AssessmentRow(assessment: assessment, detail: detail(for: assessment.metric, metrics: metrics))
-            }
-        } else {
-            Text("Für heute sind noch keine Werte da. Vielleicht hat die Tracker-App noch nicht mit Apple Health synchronisiert.")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func detail(for metric: BaselineMetric, metrics: DailyMetrics) -> String? {
-        switch metric {
-        case .sleep:
-            guard let start = metrics.inBedStart, let end = metrics.inBedEnd else { return nil }
-            return "Im Bett \(MetricsFormat.timeRange(start, end))"
-        case .hrv:
-            let count = metrics.hrvSamples.count
-            return count > 0 ? "Mittel aus \(count) \(count == 1 ? "Wert" : "Werten") der Nacht" : nil
-        case .restingHR:
-            return nil
-        }
-    }
-}
-
-private struct SyncStatusView: View {
-    let sync: HealthSync
-    let requestAccess: () -> Void
-    let retry: () -> Void
-
-    var body: some View {
-        switch sync.state {
-        case .importing:
-            HStack {
-                ProgressView()
-                Text("Lese Apple Health …")
-            }
-        case .needsAuthorization:
-            Text("Cockpit braucht Lesezugriff auf Schlaf, HRV, Ruhepuls und Workouts.")
-            Button("Zugriff erlauben", action: requestAccess)
-        case .unavailable:
-            Text("Apple Health ist auf diesem Gerät nicht verfügbar.")
-                .foregroundStyle(.secondary)
-        case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
-            Button("Erneut versuchen", action: retry)
-        case .idle:
-            if let lastRun = sync.lastRun, let result = sync.lastResult {
-                LabeledContent("Aktualisiert", value: lastRun.formatted(date: .omitted, time: .shortened))
-                Text("\(result.days) Tage gelesen, \(result.newWorkouts) neue Workouts")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Noch nicht importiert")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
+#if DEBUG
 #Preview {
-    DashboardView()
-        .modelContainer(for: [DailyMetrics.self, HealthWorkout.self], inMemory: true)
+    NavigationStack {
+        ScrollView {
+            DailyCardContent(
+                now: .now,
+                days: PreviewData.days(endingAt: .now),
+                workouts: PreviewData.workouts(on: .now),
+                syncState: .idle,
+                lastSync: .now
+            )
+            .padding(.horizontal)
+        }
+        .background(Theme.screenBackground)
+        .navigationTitle("Heute")
+    }
 }
+#endif

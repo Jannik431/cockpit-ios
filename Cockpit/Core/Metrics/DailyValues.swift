@@ -13,6 +13,17 @@ nonisolated struct HRVSample: Codable, Sendable, Equatable {
     let ms: Double
 }
 
+/// One sleep stage interval of the main night, as delivered by the source.
+nonisolated struct SleepSegment: Codable, Sendable, Equatable {
+    let start: Date
+    let end: Date
+    /// Raw `SleepStage` value.
+    let stage: Int
+
+    var sleepStage: SleepStage? { SleepStage(rawValue: stage) }
+    var minutes: Double { end.timeIntervalSince(start) / 60 }
+}
+
 /// All Apple Health values for one local calendar day. A night belongs to the day you wake up.
 /// Missing values stay `nil`, they are never filled with 0.
 nonisolated struct DailyValues: Sendable, Equatable {
@@ -26,6 +37,8 @@ nonisolated struct DailyValues: Sendable, Equatable {
     var deepMin: Int?
     var remMin: Int?
     var unspecifiedMin: Int?
+    /// Stage intervals of the main night (no "in bed"), sorted by start.
+    var sleepSegments: [SleepSegment] = []
     var sleepSource: String?
 
     /// Raw HRV samples of the night, kept so the aggregation can be changed later.
@@ -147,6 +160,10 @@ nonisolated enum DailyValuesBuilder {
             return mid >= night.start && mid <= night.end
         }
         guard !stageRecords.isEmpty else { return }
+
+        values.sleepSegments = stageRecords
+            .compactMap { record in record.category.map { SleepSegment(start: record.start, end: record.end, stage: $0) } }
+            .sorted { $0.start < $1.start }
 
         let minutes = Dictionary(grouping: stageRecords) { $0.category.flatMap(SleepStage.init(rawValue:)) }
             .mapValues { $0.reduce(0) { $0 + $1.durationMinutes } }

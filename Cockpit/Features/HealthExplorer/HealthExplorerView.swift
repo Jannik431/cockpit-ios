@@ -26,9 +26,11 @@ struct HealthExplorerView: View {
     @ViewBuilder
     private var content: some View {
         switch model.state {
-        case .idle, .loading where model.summaries.isEmpty:
-            ProgressView("Lese Apple Health …")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .idle:
+            loadingView
+
+        case .loading where model.summaries.isEmpty:
+            loadingView
 
         case .unavailable:
             ContentUnavailableView(
@@ -63,6 +65,11 @@ struct HealthExplorerView: View {
         case .loading, .loaded:
             resultList
         }
+    }
+
+    private var loadingView: some View {
+        ProgressView("Lese Apple Health …")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var resultList: some View {

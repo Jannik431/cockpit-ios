@@ -27,6 +27,29 @@ nonisolated enum MetricsFormat {
         }
     }
 
+    struct ValuePart: Hashable {
+        let number: String
+        let unit: String
+    }
+
+    /// Value split into number and unit for large display, e.g. [7 h] [40 min].
+    static func valueParts(_ value: Double?, for metric: BaselineMetric) -> [ValuePart] {
+        guard let value else { return [ValuePart(number: missing, unit: "")] }
+        switch metric {
+        case .sleep:
+            let total = Int(value.rounded())
+            let hours = total / 60
+            let rest = total % 60
+            return hours > 0
+                ? [ValuePart(number: "\(hours)", unit: "h"), ValuePart(number: "\(rest)", unit: "min")]
+                : [ValuePart(number: "\(rest)", unit: "min")]
+        case .hrv:
+            return [ValuePart(number: ExplorerFormat.number(value), unit: "ms")]
+        case .restingHR:
+            return [ValuePart(number: ExplorerFormat.number(value, digits: 0), unit: "bpm")]
+        }
+    }
+
     /// Signed difference, e.g. "+15 min", "−6,1 ms".
     static func difference(_ difference: Double, for metric: BaselineMetric) -> String {
         let sign = difference < 0 ? "−" : "+"

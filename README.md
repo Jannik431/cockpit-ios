@@ -2,7 +2,14 @@
 
 A personal iOS training dashboard that reads sleep, heart rate variability and resting heart rate from Apple Health, compares them against your **own** baseline, and exports clean, versioned weekly reports for training planning.
 
-> **Status:** Phase 1 in progress. The Health Explorer, the Apple Health import and personal baselines are done; the daily card, questionnaire and export are next. See the [roadmap](#roadmap).
+> **Status:** Phase 1 in progress. The Health Explorer, the Apple Health import, personal baselines and the daily card are done; the questionnaire and export are next. See the [roadmap](#roadmap).
+
+<p align="center">
+  <img src="docs/screenshots/daily-card-light.png" width="300" alt="Daily card in light mode: sleep hypnogram, HRV and resting heart rate over 10 days, each with its deviation from the personal norm">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/daily-card-dark.png" width="300" alt="Daily card in dark mode">
+</p>
+<p align="center"><sub>Rendered with synthetic data (<code>scripts/screenshots.sh</code>).</sub></p>
 
 ## Why
 
@@ -19,7 +26,7 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 | 🔍 | **Health Explorer:** shows which Apple Health data actually arrives, from which source and device, how often, at what time of day, and where the gaps are. Exports a Markdown summary. | ✅ Done |
 | 📥 | **Apple Health import:** 90 days of history on first launch, then incremental with a 3-day overlap for late syncs. Per wake day: sleep window and stages, raw nightly HRV samples plus their mean, resting heart rate. Workouts are de-duplicated by HealthKit UUID and grouped into suggested sessions. | ✅ Done |
 | 📏 | **Personal baselines:** 30-day norm (median of the days *before*, at least 14 values) and 7-day trend. Deviations as a difference in the metric's unit and as a robust z-score (scaled MAD, HRV on log scale) with transparent thresholds. | ✅ Done |
-| 📊 | **Daily card:** sleep, HRV and resting heart rate at a glance, with their deviation from the norm | 🚧 Next |
+| 📊 | **Daily card:** last night's sleep as a hypnogram with minutes per stage; HRV and resting heart rate over the last 10 days with the norm range as a band (gaps stay gaps); today's training. Deviations are coloured green/yellow/orange by their likely effect, and the method is explained in the app. | ✅ Done |
 | 📝 | **Wellbeing questionnaire:** fixed core based on the Hooper index plus conditional questions, under 30 seconds a day | 🚧 Next |
 | 📤 | **Weekly report:** versioned JSON + Markdown export | 🚧 Next |
 | 📅 | Import of the planned training week (CSV), session RPE, configurable rule hints | Phase 2 |
@@ -68,6 +75,7 @@ Requirements: macOS with Xcode 26+, [Homebrew](https://brew.sh).
 brew install xcodegen xcbeautify
 xcodegen generate
 scripts/test.sh               # build and run unit tests in the simulator
+scripts/screenshots.sh        # render the daily card with synthetic data
 ```
 
 To run on an iPhone, set your own `DEVELOPMENT_TEAM` and bundle ID prefix in `project.yml`, connect the phone and run:
@@ -80,7 +88,7 @@ With a free Apple developer account the signature expires after 7 days. Running 
 
 ## Roadmap
 
-1. **Data and daily card:** HealthKit access ✅, Health Explorer ✅, Apple Health import ✅, baselines with tests ✅, daily card, questionnaire core, JSON export
+1. **Data and daily card:** HealthKit access ✅, Health Explorer ✅, Apple Health import ✅, baselines with tests ✅, daily card ✅, questionnaire core, JSON export
 2. **Plan and report:** CSV import of the training week, session RPE, weekly report JSON + Markdown, rule hints
 3. **Extensions:** gym logging (e1RM, rest timer / Live Activity), spreadsheet sync via API, charts and analyses
 

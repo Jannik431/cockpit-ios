@@ -56,6 +56,10 @@ struct DailyValuesBuilderTests {
         #expect(day.unspecifiedMin == nil)
         #expect(day.asleepMin == 465)
         #expect(day.sleepSource == "com.example.tracker")
+
+        // Segments: all stages of the night in order, without "in bed".
+        #expect(day.sleepSegments.map(\.sleepStage) == [.asleepCore, .asleepDeep, .asleepREM, .awake, .asleepCore])
+        #expect(day.sleepSegments.first?.start == date(11, 16, 22, 45))
     }
 
     @Test func napIsIgnored() {
