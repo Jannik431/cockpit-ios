@@ -32,6 +32,12 @@ if [[ -z "${UDID:-}" ]]; then
 fi
 
 xcodegen generate --quiet
+
+if ! xcodebuild -project Cockpit.xcodeproj -scheme Cockpit -showdestinations 2>/dev/null | grep -q "id:${UDID}"; then
+  echo "iPhone ist gekoppelt, aber gerade nicht erreichbar. Per Kabel anschließen, entsperren und erneut versuchen." >&2
+  exit 1
+fi
+
 BUILD_ARGS=(-project Cockpit.xcodeproj -scheme Cockpit -configuration Debug -destination "id=${UDID}")
 xcodebuild build "${BUILD_ARGS[@]}" -allowProvisioningUpdates | xcbeautify
 

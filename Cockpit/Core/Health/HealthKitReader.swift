@@ -36,7 +36,8 @@ final class HealthKitReader {
             end: sample.endDate,
             sourceName: sample.sourceRevision.source.name,
             sourceBundleID: sample.sourceRevision.source.bundleIdentifier,
-            deviceName: sample.device?.name ?? sample.device?.model
+            deviceName: sample.device?.name ?? sample.device?.model,
+            healthID: sample.uuid
         )
         switch sample {
         case let quantity as HKQuantitySample:
@@ -47,6 +48,7 @@ final class HealthKitReader {
             record.category = category.value
         case let workout as HKWorkout:
             record.value = workout.duration / 60
+            record.category = Int(workout.workoutActivityType.rawValue)
             record.label = workout.workoutActivityType.displayName
         default:
             break
@@ -69,6 +71,7 @@ private extension HKWorkoutActivityType {
         case .flexibility: "Beweglichkeit"
         case .mixedCardio: "Gemischtes Cardio"
         case .swimming: "Schwimmen"
+        case .surfingSports: "Surfen"
         case .other: "Andere"
         default: "Typ \(rawValue)"
         }

@@ -48,6 +48,16 @@ Zu lesende Typen: `sleepAnalysis`, `heartRateVariabilitySDNN`, `restingHeartRate
 - Datum immer als **lokaler Kalendertag** (Zeitzone, Sommerzeit).
 - Sync-Verzögerung einplanen: „Daten noch nicht da“ ist ein normaler Zustand.
 
+### Erkenntnisse aus dem Health Explorer (30 Tage Realdaten)
+
+| Typ | Befund | Konsequenz |
+|---|---|---|
+| Schlaf | Eine Quelle; Phasen (Kern/Tief/REM/Wach) und genau ein „Im Bett“-Eintrag pro Nacht | Längster „Im Bett“-Eintrag pro Aufwach-Tag ist die Nacht; Phasen zählen per Mittelpunkt dazu; Nickerchen werden ignoriert |
+| HRV | ~3 Werte pro Nacht. Die Tracker-App zeigt **RMSSD**, in Health steht **SDNN**; die Zahlen weichen ab | Eigene Metrik `healthkit_sdnn`, nie mit Werten aus der Tracker-App mischen; Rohwerte der Nacht speichern, Nachtmittel daraus |
+| Ruhepuls | Ein Wert pro Tag, Zeitstempel ist ein Datumsstempel (00:00, in der Sommerzeit 01:00) | Zuordnung nach Kalendertag |
+| Herzfrequenz | Mehrere tausend Werte pro Tag, im Training dichter | Wird nicht importiert; bei Bedarf später gezielt pro Workout |
+| Workouts | Typen brauchbar: Krafttraining = Gym, „Andere“ (automatische Erkennung) = Handball; Spiele werden teils in mehrere Workouts geteilt | Typ nur als Vorschlag; gleiche Art mit < 30 min Abstand = eine Einheit |
+
 ---
 
 ## 4. Dashboard (Tageskarte)
@@ -83,16 +93,31 @@ Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöh
 
 ## 6. Datenmodell (Skizze)
 
+Umgesetzt (Phase 1): `DailyMetrics` und `HealthWorkout`. Der Rest ist noch Skizze.
+
 ```swift
-@Model final class DailyMetrics {
-    @Attribute(.unique) var day: Date          // local calendar day (start of day)
-    var sleepDurationMin: Int?
-    var sleepStagesJSON: Data?
-    var hrvMs: Double?
+@Model final class DailyMetrics {              // re-importable from Apple Health
+    @Attribute(.unique) var day: Date          // local wake day (start of day)
+    var inBedStart: Date?, inBedEnd: Date?
+    var asleepMin: Int?, awakeMin: Int?
+    var coreMin: Int?, deepMin: Int?, remMin: Int?, unspecifiedMin: Int?
+    var sleepSource: String?
+    var hrvMetric: String?                     // "healthkit_sdnn"
+    var hrvSamplesJSON: Data?                  // raw night samples [{time, ms}]
+    var hrvNightMeanMs: Double?
     var hrvSource: String?
     var restingHR: Double?
     var restingHRSource: String?
     var fetchedAt: Date
+}
+
+@Model final class HealthWorkout {
+    @Attribute(.unique) var healthID: UUID     // HealthKit UUID
+    var day: Date
+    var start: Date, end: Date
+    var activityTypeRaw: Int                   // kind is only suggested from this
+    var activityTypeName: String?
+    var sourceBundleID: String
 }
 
 @Model final class QuestionnaireEntry {
@@ -106,7 +131,7 @@ Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöh
 
 @Model final class PlannedSession {
     var date: Date
-    var kind: String                           // "gym" | "team" | "other"
+    var kind: String                           // "gym" | "handball" | "other"
     var title: String
     var exercisesJSON: Data?
     var sourceWeekLabel: String?
@@ -130,7 +155,9 @@ Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöh
 }
 ```
 
-Typen und Beziehungen werden nach dem Health Explorer finalisiert.
+**Import:** Beim ersten Start die letzten 90 Tage, danach ab dem letzten gespeicherten Tag minus 3 Tage (spät synchronisierte Werte werden nachgezogen). Upsert nach Tag bzw. HealthKit-UUID. Pro Metrik wird nur die Quelle mit den meisten Werten verwendet.
+
+**Hinweis:** Sobald nicht wiederherstellbare Daten (Fragebogen, Session-RPE) gespeichert werden, kommt ein versioniertes SwiftData-Schema (`VersionedSchema`) mit Migrationsplan dazu.
 
 ---
 

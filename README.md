@@ -2,7 +2,7 @@
 
 A personal iOS training dashboard that reads sleep, heart rate variability and resting heart rate from Apple Health, compares them against your **own** baseline, and exports clean, versioned weekly reports for training planning.
 
-> **Status:** Phase 1 in progress. The Health Explorer is done; the daily card, questionnaire and export are next. See the [roadmap](#roadmap).
+> **Status:** Phase 1 in progress. The Health Explorer and the Apple Health import are done; baselines, the daily card, questionnaire and export are next. See the [roadmap](#roadmap).
 
 ## Why
 
@@ -17,6 +17,7 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 | | Feature | Status |
 |---|---|---|
 | 🔍 | **Health Explorer:** shows which Apple Health data actually arrives, from which source and device, how often, at what time of day, and where the gaps are. Exports a Markdown summary. | ✅ Done |
+| 📥 | **Apple Health import:** 90 days of history on first launch, then incremental with a 3-day overlap for late syncs. Per wake day: sleep window and stages, raw nightly HRV samples plus their mean, resting heart rate. Workouts are de-duplicated by HealthKit UUID and grouped into suggested sessions. | ✅ Done |
 | 📊 | **Daily card:** sleep, HRV and resting heart rate compared with your personal baseline (median and MAD, at least 14 days of data) | 🚧 Next |
 | 📝 | **Wellbeing questionnaire:** fixed core based on the Hooper index plus conditional questions, under 30 seconds a day | 🚧 Next |
 | 📤 | **Weekly report:** versioned JSON + Markdown export | 🚧 Next |
@@ -27,7 +28,7 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 - **Local-first:** All health data stays on the device (SwiftData). No backend, no cloud, no accounts, no tracking.
 - **Read-only HealthKit:** Cockpit never writes to Apple Health.
 - **Honest about missing data:** Missing values are shown and exported as `null`, never as `0` and never interpolated. iOS does not reveal whether read access was denied, so “no data” is always labelled as ambiguous.
-- **Sources are never mixed:** Several apps can write the same metric. Each value keeps its source, and duplicates are made visible first.
+- **Sources and metrics are never mixed:** Several apps can write the same metric. Each value keeps its source, and only one source per metric is used. HRV is stored as `healthkit_sdnn`, because tracker apps often show RMSSD in their own UI, and the two are not comparable.
 - **Local calendar days:** Every metric is stored per local day; a night belongs to the day you wake up. This is tested across daylight-saving changes.
 - **Hints, not decisions:** The app makes no medical statements.
 
@@ -44,9 +45,13 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 ```
 Cockpit/
   App/                 App entry point
-  Core/                Shared helpers: calendar days, HealthKit access
+  Core/
+    Data/              SwiftData models
+    Health/            HealthKit access, import, sync
+    Metrics/           Pure logic: daily values, workout grouping (unit-tested)
   Features/
-    Dashboard/         Daily card
+    Dashboard/         Start screen and sync status
+    Data/              Stored days for spot checks
     HealthExplorer/    Data source analysis and report
   Resources/           Asset catalog
 CockpitTests/          Unit tests (synthetic data only)
@@ -74,7 +79,7 @@ With a free Apple developer account the signature expires after 7 days. Running 
 
 ## Roadmap
 
-1. **Data and daily card:** HealthKit access ✅, Health Explorer ✅, baselines with tests, daily card, questionnaire core, JSON export
+1. **Data and daily card:** HealthKit access ✅, Health Explorer ✅, Apple Health import ✅, baselines with tests, daily card, questionnaire core, JSON export
 2. **Plan and report:** CSV import of the training week, session RPE, weekly report JSON + Markdown, rule hints
 3. **Extensions:** gym logging (e1RM, rest timer / Live Activity), spreadsheet sync via API, charts and analyses
 
