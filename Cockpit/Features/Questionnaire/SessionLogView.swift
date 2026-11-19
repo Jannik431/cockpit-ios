@@ -42,10 +42,18 @@ struct SessionLogView: View {
                 }
 
                 Section {
-                    OptionButtons(options: (0...10).map(String.init), selection: $rpe, compact: true)
-                    Text(rpe.map { "\($0) – \(SessionScales.rpeLabel($0))" } ?? "Noch nicht angegeben")
-                        .font(.subheadline)
-                        .foregroundStyle(rpe == nil ? .secondary : .primary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Session-RPE")
+                                .font(.body.weight(.medium))
+                            Spacer()
+                            Text(rpe.map { "\($0) · \(SessionScales.rpeLabel($0))" } ?? "nicht angegeben")
+                                .font(.body.weight(rpe == nil ? .regular : .semibold))
+                                .foregroundStyle(rpe == nil ? Color.secondary : Color.accentColor)
+                        }
+                        ScaleSlider(range: 0...10, value: $rpe, low: "Ruhe", high: "maximal")
+                    }
+                    .padding(.vertical, 4)
                 } header: {
                     Text("Wie anstrengend war die Einheit insgesamt?")
                         .textCase(nil)
@@ -86,10 +94,10 @@ struct SessionLogView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") { dismiss() }
+                    Button("Abbrechen", systemImage: "xmark") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Speichern", action: save)
+                    Button("Speichern", systemImage: "checkmark", action: save)
                         .fontWeight(.semibold)
                 }
             }

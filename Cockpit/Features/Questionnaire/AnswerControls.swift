@@ -30,6 +30,82 @@ struct OptionButtons: View {
     }
 }
 
+/// Integer scale as a slider: drag the thumb or tap anywhere on the track.
+/// While unanswered (`nil`) the slider is dimmed, so nothing is stored by accident.
+struct ScaleSlider: View {
+    let range: ClosedRange<Int>
+    @Binding var value: Int?
+    let low: String
+    let high: String
+
+    /// UISlider keeps the thumb centre this far from the track ends.
+    private let thumbInset: CGFloat = 14
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                ZStack(alignment: .topLeading) {
+                    Slider(
+                        value: Binding(
+                            get: { Double(value ?? range.lowerBound) },
+                            set: { value = Int($0.rounded()) }
+                        ),
+                        in: Double(range.lowerBound)...Double(range.upperBound),
+                        step: 1
+                    ) { editing in
+                        if editing, value == nil { value = range.lowerBound }
+                    }
+                    .opacity(value == nil ? 0.35 : 1)
+                    .simultaneousGesture(SpatialTapGesture().onEnded { tap in
+                        value = step(at: tap.location.x, width: width)
+                    })
+
+                    ForEach(Array(range), id: \.self) { step in
+                        Text("\(step)")
+                            .font(.caption2.weight(step == value ? .bold : .regular))
+                            .monospacedDigit()
+                            .foregroundStyle(step == value ? Color.primary : Color.secondary)
+                            .position(x: position(of: step, width: width), y: 42)
+                            .onTapGesture { value = step }
+                    }
+                }
+            }
+            .frame(height: 52)
+
+            HStack {
+                Text(low)
+                Spacer()
+                Text(high)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .sensoryFeedback(.selection, trigger: value)
+        .accessibilityElement()
+        .accessibilityLabel("\(low) bis \(high)")
+        .accessibilityValue(value.map(String.init) ?? "nicht angegeben")
+        .accessibilityAdjustableAction { direction in
+            let current = value ?? range.lowerBound - 1
+            switch direction {
+            case .increment: value = min(current + 1, range.upperBound)
+            case .decrement: value = max(current - 1, range.lowerBound)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func position(of step: Int, width: CGFloat) -> CGFloat {
+        let fraction = CGFloat(step - range.lowerBound) / CGFloat(max(range.count - 1, 1))
+        return thumbInset + fraction * (width - 2 * thumbInset)
+    }
+
+    private func step(at x: CGFloat, width: CGFloat) -> Int {
+        let fraction = min(max((x - thumbInset) / max(width - 2 * thumbInset, 1), 0), 1)
+        return range.lowerBound + Int((fraction * CGFloat(range.count - 1)).rounded())
+    }
+}
+
 /// Renders one catalog question and edits its answer.
 struct QuestionRow: View {
     let question: Question
@@ -41,7 +117,12 @@ struct QuestionRow: View {
                 Text(question.title)
                     .font(.body.weight(.medium))
                 Spacer()
-                if question.optional {
+                if let valueText {
+                    Text(valueText)
+                        .font(.body.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
+                } else if question.optional {
                     Text("optional")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -57,31 +138,27 @@ struct QuestionRow: View {
         .padding(.vertical, 4)
     }
 
+    /// Current value next to the title for slider questions.
+    private var valueText: String? {
+        guard let value = answer?.intValue else { return nil }
+        switch question.kind {
+        case .scale: return "\(value)"
+        case .pain: return "\(value) · \(QuestionCatalog.painLabel(value))"
+        default: return nil
+        }
+    }
+
     @ViewBuilder
     private var control: some View {
         switch question.kind {
         case .scale(let range, let low, let high):
-            OptionButtons(options: range.map(String.init), selection: indexBinding(offset: range.lowerBound))
-            HStack {
-                Text(low)
-                Spacer()
-                Text(high)
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            ScaleSlider(range: range, value: intBinding, low: low, high: high)
 
         case .pain:
-            OptionButtons(options: (0...10).map(String.init), selection: indexBinding(offset: 0), compact: true)
-            HStack {
-                Text("keine")
-                Spacer()
-                Text("stärkste vorstellbar")
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            ScaleSlider(range: 0...10, value: intBinding, low: "keine", high: "stärkste vorstellbar")
 
         case .choice(let options):
-            OptionButtons(options: options, selection: indexBinding(offset: 0))
+            OptionButtons(options: options, selection: intBinding)
 
         case .yesNo:
             OptionButtons(options: ["Ja", "Nein"], selection: Binding(
@@ -92,20 +169,16 @@ struct QuestionRow: View {
         case .number(let unit, let range):
             NumberField(unit: unit, range: range, answer: $answer)
 
-        case .count(let unit, let range):
-            CountControl(unit: unit, range: range, answer: $answer)
+        case .count(let one, let many, let range, let noneLabel, let someLabel):
+            CountControl(one: one, many: many, range: range, noneLabel: noneLabel, someLabel: someLabel, answer: $answer)
 
         case .time:
-            TimeControl(answer: $answer)
+            TimeMenu(answer: $answer)
         }
     }
 
-    /// Maps stored integer values to option indices (scale 1–7 → index 0–6).
-    private func indexBinding(offset: Int) -> Binding<Int?> {
-        Binding(
-            get: { answer?.intValue.map { $0 - offset } },
-            set: { answer = $0.map { .int($0 + offset) } }
-        )
+    private var intBinding: Binding<Int?> {
+        Binding(get: { answer?.intValue }, set: { answer = $0.map { .int($0) } })
     }
 }
 
@@ -142,72 +215,73 @@ private struct NumberField: View {
     }
 }
 
+/// "Kein Alkohol" / "Alkohol getrunken", then the number (from 1 up).
 private struct CountControl: View {
-    let unit: String
+    let one: String
+    let many: String
     let range: ClosedRange<Int>
+    let noneLabel: String
+    let someLabel: String
     @Binding var answer: AnswerValue?
 
     var body: some View {
-        HStack(spacing: 12) {
-            if let value = answer?.intValue {
-                stepButton("minus", enabled: value > range.lowerBound) { answer = .int(value - 1) }
-                Text("\(value) \(unit)")
-                    .font(.title3.monospacedDigit())
-                    .frame(minWidth: 90)
-                stepButton("plus", enabled: value < range.upperBound) { answer = .int(value + 1) }
-                Spacer()
-                Button("Zurücksetzen") { answer = nil }
-                    .font(.caption)
-            } else {
-                Button("Keine") { answer = .int(range.lowerBound) }
-                    .buttonStyle(.bordered)
-                Button("1 oder mehr") { answer = .int(min(range.lowerBound + 1, range.upperBound)) }
-                    .buttonStyle(.bordered)
+        OptionButtons(options: [noneLabel, someLabel], selection: Binding(
+            get: { answer?.intValue.map { $0 == range.lowerBound ? 0 : 1 } },
+            set: { choice in
+                switch choice {
+                case 0: answer = .int(range.lowerBound)
+                case 1: answer = .int(max(answer?.intValue ?? 0, range.lowerBound + 1))
+                default: answer = nil
+                }
             }
+        ))
+
+        if let value = answer?.intValue, value > range.lowerBound {
+            HStack(spacing: 16) {
+                stepButton("minus", enabled: value > range.lowerBound + 1) { answer = .int(value - 1) }
+                Text("\(value) \(value == 1 ? one : many)")
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                    .frame(maxWidth: .infinity)
+                stepButton("plus", enabled: value < range.upperBound) { answer = .int(value + 1) }
+            }
+            .padding(.top, 4)
         }
     }
 
     private func stepButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .frame(width: 36, height: 36)
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
                 .background(Color(uiColor: .tertiarySystemFill), in: .circle)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
     }
 }
 
-private struct TimeControl: View {
+/// One tap opens the list of times (30-minute steps), one tap picks.
+private struct TimeMenu: View {
     @Binding var answer: AnswerValue?
 
+    private static let slots = Array(stride(from: 5 * 60, through: 23 * 60 + 30, by: 30))
+
     var body: some View {
-        if let minutes = answer?.minutes {
-            HStack {
-                DatePicker("Uhrzeit", selection: Binding(
-                    get: { Self.date(from: minutes) },
-                    set: { answer = .time(Self.minutes(from: $0)) }
-                ), displayedComponents: .hourAndMinute)
-                .labelsHidden()
-                Spacer()
-                Button("Entfernen") { answer = nil }
-                    .font(.caption)
+        HStack {
+            Picker("Uhrzeit", selection: Binding(
+                get: { answer?.minutes },
+                set: { answer = $0.map { .time($0) } }
+            )) {
+                Text("Uhrzeit wählen").tag(Int?.none)
+                ForEach(Self.slots, id: \.self) { minutes in
+                    Text(String(format: "%02d:%02d Uhr", minutes / 60, minutes % 60)).tag(Int?.some(minutes))
+                }
             }
-        } else {
-            Button("Uhrzeit angeben") {
-                let now = Self.minutes(from: .now)
-                answer = .time(now - now % 15)
-            }
-            .buttonStyle(.bordered)
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .fixedSize()
+            Spacer()
         }
-    }
-
-    private static func date(from minutes: Int) -> Date {
-        Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: .now) ?? .now
-    }
-
-    private static func minutes(from date: Date) -> Int {
-        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
-        return (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
     }
 }

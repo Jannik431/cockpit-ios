@@ -34,39 +34,41 @@ struct CheckInView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                ForEach(sections, id: \.title) { section in
-                    Section {
-                        ForEach(section.questions) { question in
-                            QuestionRow(question: question, answer: binding(for: question.id))
+            ScrollViewReader { proxy in
+                Form {
+                    ForEach(sections, id: \.title) { section in
+                        Section {
+                            ForEach(section.questions) { question in
+                                QuestionRow(question: question, answer: binding(for: question.id))
+                                    .id(question.id)
+                            }
+                        } header: {
+                            sectionHeader(section.title, questions: section.questions)
+                        } footer: {
+                            sectionFooter(section.title)
                         }
-                    } header: {
-                        sectionHeader(section.title, questions: section.questions)
-                    } footer: {
-                        sectionFooter(section.title)
+                    }
+
+                    Section("Notiz") {
+                        TextField("Besonderheiten, optional", text: $note, axis: .vertical)
+                            .lineLimit(2...5)
                     }
                 }
-
-                Section("Notiz") {
-                    TextField("Besonderheiten, optional", text: $note, axis: .vertical)
-                        .lineLimit(2...5)
+                .safeAreaInset(edge: .bottom) {
+                    ProgressBar(phase: phase, answers: answers) { id in
+                        withAnimation { proxy.scrollTo(id, anchor: .center) }
+                    }
                 }
             }
             .navigationTitle(phase.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") { dismiss() }
+                    Button("Abbrechen", systemImage: "xmark") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Speichern", action: save)
+                    Button("Speichern", systemImage: "checkmark", action: save)
                         .fontWeight(.semibold)
-                }
-                ToolbarItem(placement: .status) {
-                    let missing = QuestionCatalog.missing(answers, phase: phase).count
-                    Text(missing == 0 ? "Alles beantwortet" : "Noch \(missing) offen")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
             .onAppear(perform: load)
@@ -120,5 +122,50 @@ struct CheckInView: View {
         entry.save(answers: answers, note: note)
         try? context.save()
         dismiss()
+    }
+}
+
+/// Bottom bar: how much is answered, and a jump to the first open question.
+private struct ProgressBar: View {
+    let phase: CheckInPhase
+    let answers: [String: AnswerValue]
+    let jump: (String) -> Void
+
+    var body: some View {
+        let required = QuestionCatalog.questions(for: phase).filter { !$0.optional && QuestionCatalog.isVisible($0, answers: answers) }
+        let missing = QuestionCatalog.missing(answers, phase: phase)
+        let done = required.count - missing.count
+
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                if missing.isEmpty {
+                    Label("Alles beantwortet", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.green)
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(done) von \(required.count) beantwortet")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Offen: \(missing.map(\.title).joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Button("Zur offenen Frage") {
+                        if let first = missing.first { jump(first.id) }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .buttonStyle(.bordered)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            ProgressView(value: Double(done), total: Double(max(required.count, 1)))
+                .tint(missing.isEmpty ? .green : .accentColor)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.bar)
     }
 }

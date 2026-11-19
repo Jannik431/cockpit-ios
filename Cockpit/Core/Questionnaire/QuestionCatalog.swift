@@ -25,8 +25,8 @@ nonisolated enum QuestionKind: Sendable, Equatable {
     case yesNo
     /// Decimal number, e.g. body weight.
     case number(unit: String, range: ClosedRange<Double>)
-    /// Whole number with stepper, e.g. drinks.
-    case count(unit: String, range: ClosedRange<Int>)
+    /// Whole number, e.g. drinks: first "none" or "some", then a stepper starting at 1.
+    case count(one: String, many: String, range: ClosedRange<Int>, noneLabel: String, someLabel: String)
     /// Clock time, stored as minutes since midnight.
     case time
 }
@@ -95,8 +95,20 @@ nonisolated enum QuestionCatalog {
         Question(id: "last_caffeine_time", phase: .evening, section: "Ernährung", title: "Letztes Koffein um",
                  kind: .time, shownIfYes: "caffeine_today"),
         Question(id: "alcohol_drinks", phase: .evening, section: "Ernährung", title: "Alkohol",
-                 kind: .count(unit: "Drinks", range: 0...20)),
+                 kind: .count(one: "Drink", many: "Drinks", range: 0...20,
+                              noneLabel: "Kein Alkohol", someLabel: "Alkohol getrunken")),
     ]
+
+    /// Verbal anchors of the 0–10 pain scale.
+    static func painLabel(_ value: Int) -> String {
+        switch value {
+        case ...0: "keine"
+        case 1...3: "leicht"
+        case 4...6: "mittel"
+        case 7...9: "stark"
+        default: "stärkste vorstellbar"
+        }
+    }
 
     /// Weekdays (Calendar: 1 = Sunday) on which weighing is suggested.
     static let weighInWeekdays: Set<Int> = [2, 4, 6]

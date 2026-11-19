@@ -35,12 +35,11 @@ struct ScreenshotTests {
     @Test(.enabled(if: directory != nil))
     func morningCheckControls() throws {
         let answers: [String: AnswerValue] = [
-            "sleep_quality": .int(5), "energy": .int(4), "illness": .int(0),
-            "pain_knee_right_morning": .int(2), "hrv_rmssd_zepp": .double(42),
+            "sleep_quality": .int(5), "pain_knee_right_morning": .int(4),
+            "caffeine_today": .bool(true), "last_caffeine_time": .time(15 * 60 + 30), "alcohol_drinks": .int(2),
         ]
-        let questions = QuestionCatalog.questions(for: .morning).filter {
-            ["sleep_quality", "energy", "illness", "pain_knee_right_morning", "hrv_rmssd_zepp"].contains($0.id)
-        }
+        let ids = ["sleep_quality", "energy", "pain_knee_right_morning", "last_caffeine_time", "alcohol_drinks"]
+        let questions = ids.compactMap(QuestionCatalog.question)
         let view = VStack(spacing: 12) {
             ForEach(questions) { question in
                 QuestionRow(question: question, answer: .constant(answers[question.id]))
