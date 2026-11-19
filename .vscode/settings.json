@@ -1,0 +1,12 @@
+{
+  "sweetpad.build.xcodeWorkspacePath": "Cockpit.xcodeproj/project.xcworkspace",
+  "sweetpad.xcodegen.autogenerate": true,
+  "files.exclude": {
+    "build": true,
+    "**/.DS_Store": true
+  },
+  "search.exclude": {
+    "build": true,
+    "Cockpit.xcodeproj": true
+  }
+}

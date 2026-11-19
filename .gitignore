@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Xcode project is generated from project.yml (run `xcodegen generate`)
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+*.xcresult
+
+# VS Code / SweetPad / SourceKit-LSP (machine-specific)
+buildServer.json
+.sweetpad/
+.build/
+
+# Private data: real health data, sheet exports, weekly reports
+# Never commit real data (see DASHBOARD_APP_SPEC.md, section 13).
+private/
+exports/
+weekly_report_*
+*.csv
