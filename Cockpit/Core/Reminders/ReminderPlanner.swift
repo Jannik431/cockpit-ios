@@ -11,6 +11,7 @@ nonisolated struct PlannedReminder: Sendable, Equatable {
 
 nonisolated enum ReminderRoute {
     static let morning = "checkin.morning"
+    static let midday = "checkin.midday"
     static let evening = "checkin.evening"
     static let weighIn = "weighin"
     static let sessionPrefix = "session."
@@ -21,6 +22,7 @@ nonisolated enum ReminderRoute {
 /// What has already been done on a day, so reminders for it can be skipped.
 nonisolated struct ReminderDayStatus: Sendable, Equatable {
     var morningComplete = false
+    var middayAnswered = false
     var eveningComplete = false
     var weightEntered = false
 }
@@ -45,7 +47,10 @@ nonisolated struct SessionReminderPlan: Sendable, Equatable {
 nonisolated enum ReminderPlanner {
     static let morningTime = (hour: 9, minute: 0)
     static let weighInTime = (hour: 8, minute: 30)
+    static let middayTime = (hour: 13, minute: 30)
     static let eveningTime = (hour: 22, minute: 30)
+    /// Notification category with the answer buttons 1–5 for the energy at noon.
+    static let middayCategory = "energy_midday"
     /// Daily reminders are planned this far ahead and refreshed whenever the app runs (iOS allows 64 pending).
     static let daysAhead = 14
 
@@ -76,6 +81,12 @@ nonisolated enum ReminderPlanner {
                     id: dailyPrefix + "morning." + stamp, date: date, title: "Morgen-Check",
                     body: "Wie hast du geschlafen? Dauert etwa 30 Sekunden.",
                     route: ReminderRoute.morning))
+            }
+            if !done.middayAnswered, let date = at(middayTime), date > now {
+                result.append(PlannedReminder(
+                    id: dailyPrefix + "midday." + stamp, date: date, title: "Energie am Mittag",
+                    body: "Wie wach bist du gerade? Lange drücken und 1–5 antippen.",
+                    route: ReminderRoute.midday))
             }
             if !done.eveningComplete, let date = at(eveningTime), date > now {
                 result.append(PlannedReminder(
@@ -135,6 +146,7 @@ nonisolated enum ReminderPlanner {
         return routes.map { route in
             switch route {
             case ReminderRoute.weighIn: dailyPrefix + "weighin." + stamp
+            case ReminderRoute.midday: dailyPrefix + "midday." + stamp
             case ReminderRoute.evening: dailyPrefix + "evening." + stamp
             default: dailyPrefix + "morning." + stamp
             }

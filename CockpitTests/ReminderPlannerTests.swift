@@ -21,13 +21,14 @@ struct ReminderPlannerTests {
     @Test func mondayEarlyGetsWeighInMorningAndEvening() {
         let reminders = ReminderPlanner.dailyReminders(now: date(16, 7), status: [:], calendar: berlin)
         let today = todays(reminders)
-        #expect(today.map(\.route) == [ReminderRoute.weighIn, ReminderRoute.morning, ReminderRoute.evening])
-        #expect(today.map(\.date) == [date(16, 8, 30), date(16, 9), date(16, 22, 30)])
+        #expect(today.map(\.route) == [ReminderRoute.weighIn, ReminderRoute.morning, ReminderRoute.midday, ReminderRoute.evening])
+        #expect(today.map(\.date) == [date(16, 8, 30), date(16, 9), date(16, 13, 30), date(16, 22, 30)])
     }
 
     @Test func pastTimesAndDoneChecksAreSkipped() {
         var status = ReminderDayStatus()
         status.eveningComplete = true
+        status.middayAnswered = true
         let reminders = ReminderPlanner.dailyReminders(now: date(16, 10), status: [date(16, 0): status], calendar: berlin)
         #expect(todays(reminders).isEmpty)
     }

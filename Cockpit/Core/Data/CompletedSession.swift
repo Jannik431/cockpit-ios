@@ -18,6 +18,11 @@ final class CompletedSession {
     /// Handball only: index into `SessionScales.throwVolumes`.
     var throwVolume: Int?
     var note: String?
+    /// Knee pain during the session, 0–10. Added in schema V2 (scales version 2).
+    var kneePainLeft: Int?
+    var kneePainRight: Int?
+    /// Handball match only: minutes on court. Added in schema V2.
+    var minutesPlayed: Int?
     /// Linked Apple Health workouts; empty for sessions logged without the watch.
     var workoutIDs: [UUID]
     var scalesVersion: Int

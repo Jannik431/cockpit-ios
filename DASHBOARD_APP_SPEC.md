@@ -102,20 +102,26 @@ Täglich unter 30 Sekunden.
 
 Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöht `schemaVersion`, alte Antworten bleiben. Fehlende Antworten bleiben `null`.
 
-**Umgesetzt: Katalog Version 1** (`QuestionCatalog`, `SessionScales`). Bis zur ersten echten Nutzung noch frei änderbar, danach nur mit neuer Version.
+**Umgesetzt: Katalog Version 2** (`QuestionCatalog`), Einheiten-Skalen Version 2 (`SessionScales`). Antworten behalten die Version, in der sie gegeben wurden; Antworten auf nicht mehr gestellte Fragen bleiben gespeichert.
 
 | Zeitpunkt | Fragen (ID) | Skala |
 |---|---|---|
 | Morgen-Check | `sleep_quality`, `energy`, `muscle_soreness`, `stress`, `training_motivation` | 1–7, höher = besser |
-| | `illness` | keine / leichte / krank |
+| | `illness` → bei „leichte“/„krank“ `symptoms` (Hals, Schnupfen, Husten, Fieber, Magen-Darm, Gliederschmerzen) | Auswahl; Mehrfachauswahl |
 | | `pain_<region>_morning` für Knie links/rechts, Schulter links/rechts, Rücken, Ellenbogen | 0–10 (NRS), Schnellwahl „Keine Beschwerden“ |
 | | `hrv_rmssd_zepp` (optional), `body_weight` (optional, Wiegetage Mo/Mi/Fr) | ms, kg |
-| Abend-Check (ab 17 Uhr) | `pain_<region>_evening` für dieselben Regionen | 0–10 |
+| Mittag (ab 12 Uhr) | `energy_midday` | 1–5, auch direkt aus der Benachrichtigung |
+| Abend-Check (ab 17 Uhr, bis 4 Uhr nachts für den Vortag) | `knee_daily_left/right` (Knie im Alltag, ohne Training) | 0–10 |
+| | `pain_<region>_evening` für Schulter links/rechts, Rücken, Ellenbogen | 0–10 |
 | | `food_amount`, `protein_ok`, `caffeine_today` → `last_caffeine_time`, `alcohol_drinks` | Auswahl, ja/nein, Uhrzeit, Anzahl |
-| Pro Einheit | Session-RPE, Dauer, bei Handball Spiel/Training und Wurfvolumen | Borg CR10 0–10; kaum/wenig/mittel/viel |
+| Pro Einheit | Session-RPE, Dauer, Knie während der Einheit links/rechts; bei Handball Spiel/Training, Spielminuten (nur Spiel), Wurfvolumen | Borg CR10 0–10; 0–10; Minuten; kaum/wenig/mittel/viel |
 
-- **Timing:** Die Tageskarte zeigt Morgen- und Abend-Check mit Status. Eine Einheit aus Apple Health, die vor mindestens 30 Minuten geendet hat und noch kein RPE hat, erscheint oben als Hinweis.
-- **Push-Erinnerungen** (lokal, `ReminderPlanner`): Morgen-Check 9:00, Wiegen Mo/Mi/Fr 8:30, Abend-Check 22:30. Sie werden 14 Tage im Voraus geplant, bei jedem App-Start und nach jedem gespeicherten Bogen neu berechnet und entfallen, wenn der Check schon erledigt bzw. das Gewicht eingetragen ist. Antippen öffnet den passenden Bogen.
+Versionen: Katalog 1 → 2 ersetzt die abendliche Knie-Frage (`pain_knee_*_evening`) durch „Knie im Alltag“ und ergänzt Symptome und die Mittagsfrage. Einheiten-Skalen 1 → 2 ergänzen Knie und Spielminuten.
+
+- **Timing:** Die Tageskarte zeigt Morgen-Check, Mittagsfrage und Abend-Check mit Status. Eine Einheit aus Apple Health, die vor mindestens 30 Minuten geendet hat und noch kein RPE hat, erscheint oben als Hinweis. Vor 4 Uhr gilt noch der Vortag („logischer Tag“).
+- **Vergangene Tage:** Über den Tagesumschalter lassen sich frühere Tage ansehen und Check-ins und Einheiten nachtragen.
+- **Einheiten:** Selbst erfasste Einheiten lassen sich löschen; falsch erkannte Workouts aus Apple Health lassen sich ausblenden (zählen dann nirgends mit, wieder einblendbar).
+- **Push-Erinnerungen** (lokal, `ReminderPlanner`): Wiegen Mo/Mi/Fr 8:30, Morgen-Check 9:00, Mittag 13:30 (mit Antwortknöpfen 1–5), Abend-Check 22:30. Sie werden 14 Tage im Voraus geplant, bei jedem App-Start und nach jedem gespeicherten Bogen neu berechnet und entfallen, wenn der Check schon erledigt ist. Antippen öffnet den passenden Bogen. Alle Erinnerungen haben Ton; ob das iPhone dabei vibriert, hängt von den Haptik-Einstellungen ab. „Zeitkritische“ Benachrichtigungen (durchbrechen Fokus-Modi) gibt es mit dem kostenlosen Entwickler-Account nicht.
 - **RPE bei Eingang der Einheit:** HealthKit-Hintergrundzustellung (`HKObserverQuery`, Entitlement `healthkit.background-delivery`, funktioniert mit dem kostenlosen Account). Kommt ein neues Workout in Apple Health an, importiert die App im Hintergrund und plant eine Erinnerung 30 Minuten nach Ende der Einheit (bei später Synchronisierung sofort, aber nur einmal). Bei Handball fragt sie Session-RPE und Wurfvolumen ab. Wann iOS die App weckt, entscheidet das System; bei gesperrtem iPhone kann es sich verzögern.
 - **Speicherung:** `QuestionnaireEntry` (Tag, Phase, Katalog-Version, Antworten als JSON) und `CompletedSession` (bestätigte Art, Dauer, RPE, Last = RPE × Dauer, verknüpfte Workout-IDs). Ab hier gibt es ein versioniertes SwiftData-Schema mit Migrationsplan; der alte, unversionierte Speicher (nur Health-Daten) wird einmalig neu angelegt und neu importiert.
 - **Zepp-RMSSD** bekommt ab 14 Werten eine eigene Norm und erscheint als eigene Zeile in der HRV-Kachel, nie vermischt mit SDNN.
@@ -196,7 +202,14 @@ Umgesetzt (Phase 1): `DailyMetrics` und `HealthWorkout`. Der Rest ist noch Skizz
 
 **Import (v1):** CSV-Export eines Wochenblatts der Plan-Tabelle per Dateiauswahl. Gelesen werden die Plan-Spalten (Tag, Datum, Einheit, Übung, Sätze×Wdh, RIR/Tempo, Pause, %1RM, Ziel kg). Der Parser toleriert Leerzeilen, Notizzeilen und deutsche Dezimalkommas. Ist-Werte und berechnete Spalten werden nicht importiert.
 
-**Export (Wochenbericht):** `weekly_report_<YYYY>-W<ww>.json` (versioniert) und `.md` (kompakte Zusammenfassung ohne Interpretation).
+**Export (Tages-CSV, umgesetzt):** `cockpit_export.csv` (`CSVExport`, `ExportService`). Die Trainingsplanung liest diese eine Datei direkt.
+- UTF-8, Komma als Trenner, Dezimalpunkt, Datum `JJJJ-MM-TT`, eine Zeile pro Tag, immer alle Tage vom ersten Tag mit Daten bis heute.
+- Leer = nicht erfasst, nie 0. Einheit steht im Spaltennamen. Spalten werden nur hinten ergänzt; `schema_version` steigt, wenn sich eine Bedeutung ändert.
+- Spalten: `datum, knie_morgen_links, knie_morgen_rechts, knie_belastung_links, knie_belastung_rechts, knie_alltag_links, knie_alltag_rechts, schulter_links, schulter_rechts, ruecken, ellenbogen, schlaf_h, hrv_rmssd_ms, gewicht_kg, notiz, ruhepuls_bpm, alkohol_drinks, krank, symptome, handball_belastung, spielminuten, wurfvolumen, kaffee, letzter_kaffee_uhrzeit, energie_mittag, trainingslast_au, schema_version`.
+- Herkunft: Schmerzen morgens aus dem Morgen-Check; `knie_alltag` aus dem Abend-Check; `knie_belastung` = höchster Wert der Einheiten des Tages; `schlaf_h` = Nacht, die am Morgen des Tages endet; `hrv_rmssd_ms` nur aus dem Zepp-Feld (RMSSD), nie SDNN; `krank` = 1 schon bei leichten Anzeichen, Details in `symptome` (mit `;` getrennt); `handball_belastung` aus dem höchsten Handball-RPE (bis 4 leicht, 5–6 mittel, ab 7 hart); `wurfvolumen` = höchste Stufe des Tages; `kaffee` 0/1, die Uhrzeit nur bei 1; `trainingslast_au` = Summe RPE × Minuten der Einheiten mit RPE; `notiz` = Notizen von morgens, abends und aus den Einheiten, mit „ | “ getrennt.
+- **Ablage:** Die Datei wird einmal über die Dateien-App verknüpft (z. B. in einem Cloud-Ordner der Trainingsplanung) und danach nach jedem gespeicherten Check-in, jeder Einheit und beim Öffnen überschrieben. Auf dem Gerät mit Google Drive geprüft: Die verknüpfte Datei wird zuverlässig überschrieben. Als Rückfall gibt es „Datei teilen“.
+
+**Export (Wochenbericht, geplant):** `weekly_report_<YYYY>-W<ww>.json` (versioniert) und `.md` (kompakte Zusammenfassung ohne Interpretation).
 
 ```json
 {
@@ -227,6 +240,8 @@ Regeln: Schema nur additiv erweitern; fehlende Werte `null`, nie 0; Qualitätshi
 **Phase 1 – Daten und Tageskarte:** HealthKit-Zugriff und Health Explorer, Baselines mit Tests, Tageskarte, Fragebogen-Kern, JSON-Export.
 *Abnahme:* Eine Woche Realdaten ohne Absturz; Werte stimmen stichprobenartig mit Apple Health überein; „zu wenig Daten“ und „nicht synchronisiert“ werden sauber angezeigt.
 
+**Bereits zusätzlich umgesetzt:** Belastungs-Monitoring (Wochenlast nach Art, Tageslast, akut 7 Tage vs. Ø 28 Tage mit Hinweis auf die umstrittene ACWR, Monotonie und Strain nach Foster, Wurfvolumen pro Woche, Knie neben der Last) und Gewichtsverlauf (Trend = Mittel der letzten 3 Wiegungen).
+
 **Phase 2 – Plan und Bericht:** CSV-Import, anstehendes Training, Session-RPE, Wochenbericht JSON + Markdown, Regel-Hinweise.
 *Abnahme:* Ein Wochenbericht ist ohne Nacharbeit für die Planung nutzbar.
 
@@ -248,5 +263,5 @@ Deshalb schon in der App: stabile Fragen-IDs, versionierte Schemata, Quelle je M
 
 - Gesundheitsdaten bleiben lokal, keine Cloud, kein Tracking.
 - **Keine echten Daten im Repository**; Tests und Beispiele nutzen synthetische Daten.
-- Exportdateien sind sensibel und werden bewusst geteilt, nie automatisch hochgeladen.
+- Exportdateien sind sensibel. Ausnahme (Entscheidung des Nutzers): Die Tages-CSV wird automatisch in die einmal bewusst verknüpfte Datei geschrieben, auch wenn diese in einem Cloud-Ordner liegt. Andere Exporte werden nur bewusst geteilt.
 - Die App trifft **keine medizinischen Aussagen**; Hinweise sind Orientierung.

@@ -8,6 +8,13 @@ nonisolated enum AnswerValue: Codable, Sendable, Equatable, Hashable {
     case bool(Bool)
     /// Minutes since local midnight.
     case time(Int)
+    /// Several option indices (multiple choice), sorted.
+    case list([Int])
+
+    var listValue: [Int]? {
+        if case .list(let v) = self { return v }
+        return nil
+    }
 
     var intValue: Int? {
         switch self {
@@ -43,6 +50,8 @@ nonisolated enum AnswerValue: Codable, Sendable, Equatable, Hashable {
             self = .int(int)
         } else if let double = try? container.decode(Double.self) {
             self = .double(double)
+        } else if let list = try? container.decode([Int].self) {
+            self = .list(list)
         } else {
             let text = try container.decode(String.self)
             let parts = text.split(separator: ":").compactMap { Int($0) }
@@ -60,6 +69,7 @@ nonisolated enum AnswerValue: Codable, Sendable, Equatable, Hashable {
         case .double(let v): try container.encode(v)
         case .bool(let v): try container.encode(v)
         case .time(let v): try container.encode(String(format: "%02d:%02d", v / 60, v % 60))
+        case .list(let v): try container.encode(v)
         }
     }
 }

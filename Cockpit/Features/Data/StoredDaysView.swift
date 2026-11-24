@@ -98,8 +98,32 @@ struct DayDetailView: View {
                 source(metrics.restingHRSource)
             }
 
+            let hidden = workouts.filter(\.isHidden)
+            if !hidden.isEmpty {
+                Section {
+                    ForEach(hidden) { workout in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(workout.activityTypeName ?? "Typ \(workout.activityTypeRaw)")
+                                Text(MetricsFormat.timeRange(workout.start, workout.end))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Einblenden") {
+                                workout.isHidden = false
+                                try? workout.modelContext?.save()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                } header: {
+                    Text("Ausgeblendete Workouts")
+                }
+            }
+
             Section {
-                let sessions = WorkoutGrouping.sessions(from: workouts.map(\.info))
+                let sessions = WorkoutGrouping.sessions(from: workouts.filter { !$0.isHidden }.map(\.info))
                 if sessions.isEmpty {
                     Text("Keine Workouts")
                         .foregroundStyle(.secondary)

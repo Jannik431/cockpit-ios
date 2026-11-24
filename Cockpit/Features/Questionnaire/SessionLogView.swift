@@ -20,8 +20,12 @@ struct SessionLogView: View {
     @State private var rpe: Int?
     @State private var matchIndex: Int?
     @State private var throwVolume: Int?
+    @State private var kneeLeft: Int?
+    @State private var kneeRight: Int?
+    @State private var minutesPlayed: Int?
     @State private var note = ""
     @State private var loaded = false
+    @State private var confirmHide = false
 
     private var fromHealth: Bool { draft.suggested != nil || draft.existing?.workoutIDs.isEmpty == false }
 
@@ -61,9 +65,30 @@ struct SessionLogView: View {
                     Text("Session-RPE (Borg CR10). Am aussagekräftigsten etwa 30 Minuten nach dem Training. Belastung = RPE × Dauer\(rpe.map { ": \($0 * durationMin)" } ?? "").")
                 }
 
+                Section {
+                    kneeRow("Knie links", value: $kneeLeft)
+                    kneeRow("Knie rechts", value: $kneeRight)
+                } header: {
+                    HStack {
+                        Text("Knie während der Einheit")
+                        Spacer()
+                        Button("Keine Beschwerden") {
+                            kneeLeft = 0
+                            kneeRight = 0
+                        }
+                        .font(.caption.weight(.semibold))
+                        .textCase(nil)
+                    }
+                }
+
                 if kind == .handball {
                     Section("Handball") {
                         OptionButtons(options: ["Training", "Spiel"], selection: $matchIndex)
+                        if matchIndex == 1 {
+                            Stepper(value: Binding(get: { minutesPlayed ?? 0 }, set: { minutesPlayed = $0 }), in: 0...120, step: 5) {
+                                LabeledContent("Spielminuten", value: minutesPlayed.map { "\($0) min" } ?? "nicht angegeben")
+                            }
+                        }
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Wurfvolumen")
                                 .font(.body.weight(.medium))
@@ -78,17 +103,27 @@ struct SessionLogView: View {
                         .lineLimit(1...4)
                 }
 
-                if let existing = draft.existing {
+                if draft.existing != nil || draft.suggested != nil {
                     Section {
-                        Button("Eintrag löschen", role: .destructive) {
-                            context.delete(existing)
-                            try? context.save()
-                            dismiss()
+                        if let existing = draft.existing {
+                            Button(fromHealth ? "RPE-Eintrag löschen" : "Einheit löschen", role: .destructive) {
+                                context.delete(existing)
+                                try? context.save()
+                                dismiss()
+                            }
+                        }
+                        if draft.suggested != nil {
+                            Button("Workout ausblenden (falsch erkannt)", role: .destructive) { confirmHide = true }
                         }
                     } footer: {
-                        Text(fromHealth ? "Das Workout in Apple Health bleibt erhalten." : "")
+                        Text(fromHealth ? "Das Workout in Apple Health bleibt erhalten. Ausgeblendete Workouts lassen sich unter „Gespeicherte Tage“ wieder einblenden." : "")
                     }
                 }
+            }
+            .confirmationDialog("Workout ausblenden?", isPresented: $confirmHide, titleVisibility: .visible) {
+                Button("Ausblenden", role: .destructive, action: hideWorkout)
+            } message: {
+                Text("Es zählt dann nirgends mehr mit. Ein RPE-Eintrag dazu wird gelöscht.")
             }
             .navigationTitle(draft.existing == nil ? "Einheit erfassen" : "Einheit bearbeiten")
             .navigationBarTitleDisplayMode(.inline)
@@ -115,16 +150,47 @@ struct SessionLogView: View {
             rpe = existing.sessionRPE
             matchIndex = existing.isMatch.map { $0 ? 1 : 0 }
             throwVolume = existing.throwVolume
+            kneeLeft = existing.kneePainLeft
+            kneeRight = existing.kneePainRight
+            minutesPlayed = existing.minutesPlayed
             note = existing.note ?? ""
         } else if let suggested = draft.suggested {
             kind = suggested.kind
             start = suggested.start
             durationMin = max(5, Int(suggested.activeMinutes.rounded()))
-        } else {
+        } else if Calendar.current.isDate(draft.day, inSameDayAs: .now) {
             let now = Date.now
             let rounded = Calendar.current.date(bySetting: .second, value: 0, of: now) ?? now
             start = rounded.addingTimeInterval(-3600)
+        } else {
+            // A past day: default to the evening of that day.
+            start = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: draft.day) ?? draft.day
         }
+    }
+
+    private func kneeRow(_ title: String, value: Binding<Int?>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.body.weight(.medium))
+                Spacer()
+                Text(value.wrappedValue.map { "\($0) · \(QuestionCatalog.painLabel($0))" } ?? "nicht angegeben")
+                    .font(.body.weight(value.wrappedValue == nil ? .regular : .semibold))
+                    .foregroundStyle(value.wrappedValue == nil ? Color.secondary : Color.accentColor)
+            }
+            ScaleSlider(range: 0...10, value: value, low: "keine", high: "stärkste vorstellbar")
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func hideWorkout() {
+        guard let suggested = draft.suggested else { return }
+        let ids = suggested.workoutIDs
+        let workouts = (try? context.fetch(FetchDescriptor<HealthWorkout>(predicate: #Predicate { ids.contains($0.healthID) }))) ?? []
+        for workout in workouts { workout.isHidden = true }
+        if let existing = draft.existing { context.delete(existing) }
+        try? context.save()
+        dismiss()
     }
 
     private func save() {
@@ -148,6 +214,9 @@ struct SessionLogView: View {
         session.sessionRPE = rpe
         session.isMatch = kind == .handball ? matchIndex.map { $0 == 1 } : nil
         session.throwVolume = kind == .handball ? throwVolume : nil
+        session.minutesPlayed = kind == .handball && matchIndex == 1 ? minutesPlayed : nil
+        session.kneePainLeft = kneeLeft
+        session.kneePainRight = kneeRight
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         session.note = trimmed.isEmpty ? nil : trimmed
         session.scalesVersion = SessionScales.version

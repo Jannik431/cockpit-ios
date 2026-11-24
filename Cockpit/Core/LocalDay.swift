@@ -2,6 +2,15 @@ import Foundation
 
 /// Calendar helpers. All metrics are stored per local calendar day (spec, section 5).
 nonisolated enum LocalDay {
+    /// Until this hour the app still treats the previous day as "today" (evening check after midnight).
+    static let rolloverHour = 4
+
+    /// The day the app shows and the evening check belongs to: before 04:00 that is still yesterday.
+    static func logicalToday(_ now: Date = .now, calendar: Calendar = .current) -> Date {
+        let shifted = calendar.date(byAdding: .hour, value: -rolloverHour, to: now) ?? now
+        return calendar.startOfDay(for: shifted)
+    }
+
     /// Start of the local calendar day that contains `date`.
     static func start(of date: Date, calendar: Calendar = .current) -> Date {
         calendar.startOfDay(for: date)

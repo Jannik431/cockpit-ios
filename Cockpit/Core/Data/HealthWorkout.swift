@@ -11,6 +11,8 @@ final class HealthWorkout {
     var activityTypeRaw: Int
     var activityTypeName: String?
     var sourceBundleID: String
+    /// Hidden by the user (e.g. wrongly detected). Hidden workouts count nowhere. Added in schema V2.
+    var isHidden: Bool = false
 
     init(healthID: UUID, day: Date, start: Date, end: Date, activityTypeRaw: Int, activityTypeName: String?, sourceBundleID: String) {
         self.healthID = healthID

@@ -44,6 +44,24 @@ final class QuestionnaireEntry {
         return QuestionCatalog.missing(answers, phase: phase).isEmpty
     }
 
+    /// Sets one answer directly (e.g. energy at noon from a notification button), creating the entry if needed.
+    static func setAnswer(_ value: AnswerValue?, for questionID: String, phase: CheckInPhase, day: Date,
+                          context: ModelContext, now: Date = .now) {
+        let phaseRaw = phase.rawValue
+        let existing = try? context.fetch(FetchDescriptor<QuestionnaireEntry>(
+            predicate: #Predicate { $0.day == day && $0.phase == phaseRaw }
+        )).first
+        let entry = existing ?? {
+            let new = QuestionnaireEntry(day: day, phase: phase, now: now)
+            context.insert(new)
+            return new
+        }()
+        var answers = entry.answers
+        answers[questionID] = value
+        entry.save(answers: answers, note: entry.note, now: now)
+        try? context.save()
+    }
+
     /// Numeric values of one question keyed by day, e.g. for the Zepp RMSSD norm.
     static func values(of questionID: String, from entries: [QuestionnaireEntry]) -> [Date: Double] {
         Dictionary(

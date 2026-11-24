@@ -30,6 +30,34 @@ struct OptionButtons: View {
     }
 }
 
+/// Grid of toggles for multiple choice.
+struct MultiChoiceButtons: View {
+    let options: [String]
+    @Binding var selection: Set<Int>
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 6)], spacing: 6) {
+            ForEach(options.indices, id: \.self) { index in
+                let selected = selection.contains(index)
+                Button {
+                    if selected { selection.remove(index) } else { selection.insert(index) }
+                } label: {
+                    Label(options[index], systemImage: selected ? "checkmark" : "plus")
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .foregroundStyle(selected ? Color.white : Color.primary)
+                        .background(selected ? Color.accentColor : Color(uiColor: .tertiarySystemFill),
+                                    in: .rect(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+    }
+}
+
 /// Integer scale as a slider: drag the thumb or tap anywhere on the track.
 /// While unanswered (`nil`) the slider is dimmed, so nothing is stored by accident.
 struct ScaleSlider: View {
@@ -159,6 +187,12 @@ struct QuestionRow: View {
 
         case .choice(let options):
             OptionButtons(options: options, selection: intBinding)
+
+        case .multiChoice(let options):
+            MultiChoiceButtons(options: options, selection: Binding(
+                get: { Set(answer?.listValue ?? []) },
+                set: { answer = $0.isEmpty ? nil : .list($0.sorted()) }
+            ))
 
         case .yesNo:
             OptionButtons(options: ["Ja", "Nein"], selection: Binding(

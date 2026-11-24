@@ -9,6 +9,17 @@ final class ReminderCenter {
     private let center = UNUserNotificationCenter.current()
     private let notifiedKey = "notifiedSessionKeys"
 
+    /// Answer buttons 1–5 on the noon notification (long press). Answering does not open the app.
+    func registerCategories() {
+        let labels = ["sehr müde", "müde", "okay", "wach", "hellwach"]
+        let actions = labels.enumerated().map { index, label in
+            UNNotificationAction(identifier: "energy.\(index + 1)", title: "\(index + 1) – \(label)", options: [])
+        }
+        let category = UNNotificationCategory(identifier: ReminderPlanner.middayCategory, actions: actions,
+                                              intentIdentifiers: [], options: [])
+        center.setNotificationCategories([category])
+    }
+
     func requestAuthorizationIfNeeded() async {
         guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
@@ -32,6 +43,8 @@ final class ReminderCenter {
             case .morning:
                 day.morningComplete = entry.isComplete
                 day.weightEntered = entry.answers["body_weight"] != nil
+            case .midday:
+                day.middayAnswered = entry.answers["energy_midday"] != nil
             case .evening:
                 day.eveningComplete = entry.isComplete
             case nil:
@@ -51,13 +64,14 @@ final class ReminderCenter {
         var routes: [String] = []
         if done.morningComplete { routes.append(ReminderRoute.morning) }
         if done.weightEntered { routes.append(ReminderRoute.weighIn) }
+        if done.middayAnswered { routes.append(ReminderRoute.midday) }
         if done.eveningComplete { routes.append(ReminderRoute.evening) }
         center.removeDeliveredNotifications(withIdentifiers: ReminderPlanner.dailyIDs(for: today, routes: routes))
     }
 
     private func refreshSessions(context: ModelContext, now: Date, inForeground: Bool) async {
         let since = now.addingTimeInterval(-24 * 3600)
-        let workouts = (try? context.fetch(FetchDescriptor<HealthWorkout>(predicate: #Predicate { $0.end >= since }))) ?? []
+        let workouts = (try? context.fetch(FetchDescriptor<HealthWorkout>(predicate: #Predicate { $0.end >= since && !$0.isHidden }))) ?? []
         let logs = (try? context.fetch(FetchDescriptor<CompletedSession>(predicate: #Predicate { $0.end >= since }))) ?? []
 
         let inputs: [SessionReminderInput] = WorkoutGrouping.sessions(from: workouts.map(\.info)).compactMap { session in
@@ -88,9 +102,15 @@ final class ReminderCenter {
         let content = UNMutableNotificationContent()
         content.title = reminder.title
         content.body = reminder.body
+        // Sound, and with it vibration (depending on the haptics settings). "Time sensitive" would also break through
+        // focus modes, but personal development teams do not get that capability.
         content.sound = .default
+        content.interruptionLevel = .active
         content.userInfo = ["route": reminder.route]
         content.threadIdentifier = reminder.route.hasPrefix(ReminderRoute.sessionPrefix) ? "sessions" : "checkins"
+        if reminder.route == ReminderRoute.midday {
+            content.categoryIdentifier = ReminderPlanner.middayCategory
+        }
 
         let trigger: UNNotificationTrigger
         if reminder.date.timeIntervalSince(now) < 60 {

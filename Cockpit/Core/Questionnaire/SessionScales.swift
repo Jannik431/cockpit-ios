@@ -1,8 +1,12 @@
 import Foundation
 
-/// Scales for logging a training session. Version 1, same rules as `QuestionCatalog`.
+/// Scales for logging a training session. Same versioning rules as `QuestionCatalog`.
+///
+/// History:
+/// - 1: kind, duration, session RPE, handball match/practice, throwing volume.
+/// - 2: knee pain during the session (left/right, 0–10), minutes played in a match.
 nonisolated enum SessionScales {
-    static let version = 1
+    static let version = 2
 
     /// Borg CR10 labels for session RPE (Foster): "How hard was the whole session?"
     static let rpeLabels: [Int: String] = [
@@ -25,4 +29,13 @@ nonisolated enum SessionScales {
 
     /// Handball throwing volume, stored as index.
     static let throwVolumes = ["kaum", "wenig", "mittel", "viel"]
+
+    /// Handball load band derived from session RPE (for the export): up to 4 light, 5–6 medium, from 7 hard.
+    static func handballLoadBand(rpe: Int) -> String {
+        switch rpe {
+        case ...4: "leicht"
+        case 5...6: "mittel"
+        default: "hart"
+        }
+    }
 }

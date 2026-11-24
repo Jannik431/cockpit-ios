@@ -19,7 +19,8 @@ import json, sys
 wanted = sys.argv[2]
 for d in json.load(open(sys.argv[1]))["result"]["devices"]:
     hw, conn = d.get("hardwareProperties", {}), d.get("connectionProperties", {})
-    if hw.get("deviceType") != "iPhone" or conn.get("pairingState") != "paired":
+    # Since Xcode 27, devicectl also lists simulators; only real devices count.
+    if hw.get("deviceType") != "iPhone" or hw.get("reality") == "simulated" or conn.get("pairingState") != "paired":
         continue
     if wanted in ("", d["identifier"], hw.get("udid")):
         print(d["identifier"], hw.get("udid")); break

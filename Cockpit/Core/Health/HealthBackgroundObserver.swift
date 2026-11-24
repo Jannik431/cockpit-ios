@@ -37,6 +37,7 @@ final class HealthBackgroundObserver {
         let inForeground = UIApplication.shared.applicationState == .active
         await HealthSync.shared.run(context: context)
         await ReminderCenter.shared.refresh(context: context, inForeground: inForeground)
+        ExportService.shared.exportIfLinked(context: context)
     }
 }
 

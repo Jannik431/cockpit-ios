@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+        ReminderCenter.shared.registerCategories()
         HealthBackgroundObserver.shared.start()
         return true
     }

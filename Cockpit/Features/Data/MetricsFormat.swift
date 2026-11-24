@@ -80,6 +80,11 @@ nonisolated enum MetricsFormat {
         }
     }
 
+    /// Training load in arbitrary units with thousands separator, e.g. "1.240".
+    static func load(_ value: Int) -> String {
+        value.formatted(.number.grouping(.automatic).locale(ExplorerFormat.locale))
+    }
+
     static func time(_ date: Date) -> String {
         date.formatted(.dateTime.hour().minute().locale(ExplorerFormat.locale))
     }
