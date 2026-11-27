@@ -23,6 +23,8 @@ final class CompletedSession {
     var kneePainRight: Int?
     /// Handball match only: minutes on court. Added in schema V2.
     var minutesPlayed: Int?
+    /// Unit from the training plan (`SessionScales.planUnits`), e.g. "A" or "Spiel". Added in schema V3.
+    var planUnit: String?
     /// Linked Apple Health workouts; empty for sessions logged without the watch.
     var workoutIDs: [UUID]
     var scalesVersion: Int
@@ -43,6 +45,9 @@ final class CompletedSession {
     }
 
     var sessionKind: SessionKind { SessionKind(rawValue: kind) ?? .other }
+
+    /// The plan unit, or for older logs the best guess from kind and match flag.
+    var effectivePlanUnit: String? { planUnit ?? SessionScales.planUnit(kind: sessionKind, isMatch: isMatch) }
 
     /// Foster's session load: RPE × duration in minutes (arbitrary units).
     var load: Int? { sessionRPE.map { $0 * durationMin } }

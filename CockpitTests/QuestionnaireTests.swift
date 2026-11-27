@@ -37,6 +37,11 @@ struct QuestionCatalogTests {
                     Issue.record("\(question.id) depends on a non-choice question")
                     continue
                 }
+            case .countAbove:
+                guard case .count = parent?.kind else {
+                    Issue.record("\(question.id) depends on a non-count question")
+                    continue
+                }
             }
         }
     }
@@ -56,14 +61,21 @@ struct QuestionCatalogTests {
         #expect(cleaned["pain_knee_left_evening"] == .int(3))
     }
 
-    @Test func followUpIsHiddenAndDroppedAfterNo() {
-        var answers: [String: AnswerValue] = ["caffeine_today": .bool(true), "last_caffeine_time": .time(15 * 60)]
+    @Test func followUpIsHiddenAndDroppedWhenNoCaffeine() {
+        var answers: [String: AnswerValue] = ["caffeine_drinks": .int(2), "last_caffeine_time": .time(15 * 60)]
         let followUp = QuestionCatalog.question("last_caffeine_time")!
         #expect(QuestionCatalog.isVisible(followUp, answers: answers))
 
-        answers["caffeine_today"] = .bool(false)
+        answers["caffeine_drinks"] = .int(0)
         #expect(!QuestionCatalog.isVisible(followUp, answers: answers))
         #expect(QuestionCatalog.cleaned(answers, phase: .evening)["last_caffeine_time"] == nil)
+    }
+
+    @Test func redFlagTypesOnlyAfterYes() {
+        let types = QuestionCatalog.question("knee_red_flag_types")!
+        #expect(!QuestionCatalog.isVisible(types, answers: ["knee_red_flag": .bool(false)]))
+        #expect(QuestionCatalog.isVisible(types, answers: ["knee_red_flag": .bool(true)]))
+        #expect(QuestionCatalog.redFlags.count == QuestionCatalog.redFlagExportKeys.count)
     }
 
     @Test func optionalQuestionsDoNotBlockCompletion() {
@@ -75,15 +87,16 @@ struct QuestionCatalogTests {
         #expect(answers["hrv_rmssd_zepp"] == nil)
     }
 
-    @Test func caffeineTimeIsOnlyRequiredAfterYes() {
+    @Test func caffeineTimeIsOnlyRequiredWithDrinks() {
         var answers: [String: AnswerValue] = [
-            "food_amount": .int(1), "protein_ok": .bool(true), "caffeine_today": .bool(false), "alcohol_drinks": .int(0),
+            "food_amount": .int(1), "protein_ok": .bool(true), "caffeine_drinks": .int(0), "alcohol_drinks": .int(0),
+            "knee_red_flag": .bool(false), "symptoms_time": .int(0), "long_static_posture": .bool(false),
         ]
         for question in QuestionCatalog.questions(for: .evening) where question.kind == .pain {
             answers[question.id] = .int(0)
         }
         #expect(QuestionCatalog.missing(answers, phase: .evening).isEmpty)
-        answers["caffeine_today"] = .bool(true)
+        answers["caffeine_drinks"] = .int(3)
         #expect(QuestionCatalog.missing(answers, phase: .evening).map(\.id) == ["last_caffeine_time"])
     }
 }
@@ -149,6 +162,35 @@ struct QuestionnaireStoreTests {
         #expect(entry.note == "alt")
     }
 
+    @Test func v2StoreMigratesToV3KeepingSessions() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("migration-v2-\(UUID().uuidString).store")
+        defer {
+            for suffix in ["", "-shm", "-wal"] { try? FileManager.default.removeItem(atPath: url.path + suffix) }
+        }
+        let day = Calendar.current.startOfDay(for: .now)
+
+        do {
+            let v2 = Schema(versionedSchema: CockpitSchemaV2.self)
+            let container = try ModelContainer(for: v2, configurations: ModelConfiguration(schema: v2, url: url))
+            let context = ModelContext(container)
+            let session = CockpitSchemaV2.CompletedSession(day: day, start: day, end: day.addingTimeInterval(3600),
+                                                           kind: "handball", durationMin: 90, workoutIDs: [])
+            session.sessionRPE = 6
+            session.isMatch = true
+            session.minutesPlayed = 40
+            context.insert(session)
+            try context.save()
+        }
+
+        let v3 = Persistence.currentSchema
+        let migrated = try Persistence.open(schema: v3, configuration: ModelConfiguration(schema: v3, url: url))
+        let session = try #require(try ModelContext(migrated).fetch(FetchDescriptor<CompletedSession>()).first)
+        #expect(session.sessionRPE == 6)
+        #expect(session.minutesPlayed == 40)
+        #expect(session.planUnit == nil)
+        #expect(session.effectivePlanUnit == "Spiel")
+    }
+
     @Test func versionedSchemaStoresEntriesAndSessions() throws {
         let schema = Persistence.currentSchema
         let container = try ModelContainer(
@@ -160,7 +202,7 @@ struct QuestionnaireStoreTests {
         let day = Calendar.current.startOfDay(for: .now)
 
         let entry = QuestionnaireEntry(day: day, phase: .evening)
-        entry.save(answers: ["caffeine_today": .bool(false), "last_caffeine_time": .time(600)], note: "  ")
+        entry.save(answers: ["caffeine_drinks": .int(0), "last_caffeine_time": .time(600)], note: "  ")
         context.insert(entry)
 
         let workoutID = UUID()
@@ -171,7 +213,7 @@ struct QuestionnaireStoreTests {
         try context.save()
 
         let stored = try #require(try context.fetch(FetchDescriptor<QuestionnaireEntry>()).first)
-        #expect(stored.answers == ["caffeine_today": .bool(false)])
+        #expect(stored.answers == ["caffeine_drinks": .int(0)])
         #expect(stored.note == nil)
         #expect(stored.catalogVersion == QuestionCatalog.version)
 

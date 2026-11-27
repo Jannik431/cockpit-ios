@@ -5,8 +5,29 @@ import Foundation
 /// History:
 /// - 1: kind, duration, session RPE, handball match/practice, throwing volume.
 /// - 2: knee pain during the session (left/right, 0–10), minutes played in a match.
+/// - 3: unit from the training plan (`planUnit`); the session kind is derived from it.
 nonisolated enum SessionScales {
-    static let version = 2
+    static let version = 3
+
+    /// Units of the training plan. The texts are stored and exported as they are.
+    static let planUnits = ["A", "A-moderat", "A_kurz", "B", "C", "C-Light", "C-kurz", "D", "Plyo2", "Handball", "Spiel", "Sonstiges"]
+
+    static func kind(forPlanUnit unit: String) -> SessionKind {
+        switch unit {
+        case "Handball", "Spiel": .handball
+        case "Sonstiges": .other
+        default: .gym
+        }
+    }
+
+    /// For sessions logged before plan units existed: best guess from kind and match flag, `nil` for gym (A–D unknown).
+    static func planUnit(kind: SessionKind, isMatch: Bool?) -> String? {
+        switch kind {
+        case .handball: isMatch == true ? "Spiel" : "Handball"
+        case .other: "Sonstiges"
+        case .gym: nil
+        }
+    }
 
     /// Borg CR10 labels for session RPE (Foster): "How hard was the whole session?"
     static let rpeLabels: [Int: String] = [

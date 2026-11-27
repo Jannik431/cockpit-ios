@@ -38,7 +38,7 @@ Wearables produce a lot of numbers, but most apps condense them into an opaque �
 ## Design decisions
 
 - **Local-first:** All health data stays on the device (SwiftData). No backend, no accounts, no tracking. The only exception is the daily CSV, which is written into a file the user links deliberately.
-- **Versioned data:** The SwiftData schema is versioned with a tested migration from V1 to V2, because check-in answers cannot be re-imported. Question and scale versions are stored with every answer.
+- **Versioned data:** The SwiftData schema is versioned (V1 → V2 → V3, each with a frozen copy of the changed models and a migration test, plus a backup before every migration), because check-in answers cannot be re-imported. Question and scale versions are stored with every answer.
 - **Read-only HealthKit:** Cockpit never writes to Apple Health.
 - **Honest about missing data:** Missing values are shown and exported as `null`, never as `0` and never interpolated. iOS does not reveal whether read access was denied, so “no data” is always labelled as ambiguous.
 - **Sources and metrics are never mixed:** Several apps can write the same metric. Each value keeps its source, and only one source per metric is used. HRV is stored as `healthkit_sdnn`, because tracker apps often show RMSSD in their own UI, and the two are not comparable.

@@ -98,19 +98,14 @@ final class ExportService {
         let metrics = (try? context.fetch(FetchDescriptor<DailyMetrics>())) ?? []
         let entries = (try? context.fetch(FetchDescriptor<QuestionnaireEntry>())) ?? []
         let sessions = (try? context.fetch(FetchDescriptor<CompletedSession>())) ?? []
-        let hiddenWorkouts = Set(((try? context.fetch(FetchDescriptor<HealthWorkout>(predicate: #Predicate { $0.isHidden }))) ?? []).map(\.healthID))
+        let workouts = (try? context.fetch(FetchDescriptor<HealthWorkout>())) ?? []
 
-        let visibleSessions = sessions.filter { session in
-            session.workoutIDs.isEmpty || !Set(session.workoutIDs).isSubset(of: hiddenWorkouts)
-        }
-
-        let firstDay = (metrics.map(\.day) + entries.map(\.day) + visibleSessions.map(\.day)).min() ?? today
+        let firstDay = (metrics.map(\.day) + entries.map(\.day) + sessions.map(\.day)).min() ?? today
         let count = (calendar.dateComponents([.day], from: firstDay, to: today).day ?? 0) + 1
         let days = LocalDay.window(endingAt: today, count: max(count, 1), calendar: calendar)
 
         let metricsByDay = Dictionary(metrics.map { ($0.day, $0) }, uniquingKeysWith: { first, _ in first })
         let entriesByDay = Dictionary(grouping: entries, by: \.day)
-        let sessionsByDay = Dictionary(grouping: visibleSessions, by: \.day)
 
         return days.map { day in
             var export = ExportDay(day: day)
@@ -127,7 +122,12 @@ final class ExportService {
                     export.notes.append(phase == .evening ? "Abend: \(note)" : (phase == .morning ? "Morgen: \(note)" : note))
                 }
             }
-            for session in (sessionsByDay[day] ?? []).sorted(by: { $0.start < $1.start }) {
+            // Logged sessions and Health sessions without a log (minutes only), hidden workouts excluded, by start.
+            for row in TrainingData.rows(on: day, workouts: workouts, logs: sessions) {
+                guard let session = row.log else {
+                    export.sessions.append(ExportSession(kind: row.kind, durationMin: Int(row.minutes.rounded())))
+                    continue
+                }
                 export.sessions.append(ExportSession(
                     kind: session.sessionKind,
                     rpe: session.sessionRPE,
@@ -136,9 +136,10 @@ final class ExportService {
                     throwVolume: session.throwVolume,
                     kneePainLeft: session.kneePainLeft,
                     kneePainRight: session.kneePainRight,
-                    minutesPlayed: session.minutesPlayed
+                    minutesPlayed: session.minutesPlayed,
+                    planUnit: session.effectivePlanUnit
                 ))
-                if let note = session.note { export.notes.append("\(session.sessionKind.title): \(note)") }
+                if let note = session.note { export.notes.append("\(session.effectivePlanUnit ?? session.sessionKind.title): \(note)") }
             }
             return export
         }

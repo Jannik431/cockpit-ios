@@ -102,7 +102,7 @@ Täglich unter 30 Sekunden.
 
 Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöht `schemaVersion`, alte Antworten bleiben. Fehlende Antworten bleiben `null`.
 
-**Umgesetzt: Katalog Version 2** (`QuestionCatalog`), Einheiten-Skalen Version 2 (`SessionScales`). Antworten behalten die Version, in der sie gegeben wurden; Antworten auf nicht mehr gestellte Fragen bleiben gespeichert.
+**Umgesetzt: Katalog Version 3** (`QuestionCatalog`), Einheiten-Skalen Version 3 (`SessionScales`). Antworten behalten die Version, in der sie gegeben wurden; Antworten auf nicht mehr gestellte Fragen bleiben gespeichert.
 
 | Zeitpunkt | Fragen (ID) | Skala |
 |---|---|---|
@@ -112,11 +112,13 @@ Regeln: Fragen-IDs und Skalen nie stillschweigend ändern; jede Änderung erhöh
 | | `hrv_rmssd_zepp` (optional), `body_weight` (optional, Wiegetage Mo/Mi/Fr) | ms, kg |
 | Mittag (ab 12 Uhr) | `energy_midday` | 1–5, auch direkt aus der Benachrichtigung |
 | Abend-Check (ab 17 Uhr, bis 4 Uhr nachts für den Vortag) | `knee_daily_left/right` (Knie im Alltag, ohne Training) | 0–10 |
+| | `knee_red_flag` → `knee_red_flag_types` (Wegknicken, Instabil, Schwellung, Drehschmerz, Blockade, Kniescheibe, Nachtschmerz) | ja/nein; Mehrfachauswahl |
+| | `symptoms_time` (keine / morgens / ganztags), `long_static_posture` (> 2 h am Stück gestanden/gesessen) | Auswahl; ja/nein |
 | | `pain_<region>_evening` für Schulter links/rechts, Rücken, Ellenbogen | 0–10 |
-| | `food_amount`, `protein_ok`, `caffeine_today` → `last_caffeine_time`, `alcohol_drinks` | Auswahl, ja/nein, Uhrzeit, Anzahl |
-| Pro Einheit | Session-RPE, Dauer, Knie während der Einheit links/rechts; bei Handball Spiel/Training, Spielminuten (nur Spiel), Wurfvolumen | Borg CR10 0–10; 0–10; Minuten; kaum/wenig/mittel/viel |
+| | `food_amount`, `protein_ok`, `caffeine_drinks` (alle Koffein-Getränke) → `last_caffeine_time`, `alcohol_drinks` | Auswahl, ja/nein, Anzahl, Uhrzeit, Anzahl |
+| Pro Einheit | Einheit laut Plan (A, A-moderat, A_kurz, B, C, C-Light, C-kurz, D, Plyo2, Handball, Spiel, Sonstiges; daraus Art und Spiel/Training), Session-RPE, Dauer, Knie während der Einheit links/rechts; bei Handball Spielminuten (nur Spiel), Wurfvolumen | Auswahl; Borg CR10 0–10; 0–10; Minuten; kaum/wenig/mittel/viel |
 
-Versionen: Katalog 1 → 2 ersetzt die abendliche Knie-Frage (`pain_knee_*_evening`) durch „Knie im Alltag“ und ergänzt Symptome und die Mittagsfrage. Einheiten-Skalen 1 → 2 ergänzen Knie und Spielminuten.
+Versionen: Katalog 1 → 2 ersetzt die abendliche Knie-Frage (`pain_knee_*_evening`) durch „Knie im Alltag“ und ergänzt Symptome und die Mittagsfrage. Katalog 2 → 3: Koffein als Anzahl (`caffeine_drinks` statt `caffeine_today`), Symptom-Zeitpunkt, Knie-Warnzeichen, langes Stehen/Sitzen. Einheiten-Skalen 1 → 2 ergänzen Knie und Spielminuten, 2 → 3 die Einheit laut Plan (Schema V3: `CompletedSession.planUnit`).
 
 - **Timing:** Die Tageskarte zeigt Morgen-Check, Mittagsfrage und Abend-Check mit Status. Eine Einheit aus Apple Health, die vor mindestens 30 Minuten geendet hat und noch kein RPE hat, erscheint oben als Hinweis. Vor 4 Uhr gilt noch der Vortag („logischer Tag“).
 - **Vergangene Tage:** Über den Tagesumschalter lassen sich frühere Tage ansehen und Check-ins und Einheiten nachtragen.
@@ -205,8 +207,8 @@ Umgesetzt (Phase 1): `DailyMetrics` und `HealthWorkout`. Der Rest ist noch Skizz
 **Export (Tages-CSV, umgesetzt):** `cockpit_export.csv` (`CSVExport`, `ExportService`). Die Trainingsplanung liest diese eine Datei direkt.
 - UTF-8, Komma als Trenner, Dezimalpunkt, Datum `JJJJ-MM-TT`, eine Zeile pro Tag, immer alle Tage vom ersten Tag mit Daten bis heute.
 - Leer = nicht erfasst, nie 0. Einheit steht im Spaltennamen. Spalten werden nur hinten ergänzt; `schema_version` steigt, wenn sich eine Bedeutung ändert.
-- Spalten: `datum, knie_morgen_links, knie_morgen_rechts, knie_belastung_links, knie_belastung_rechts, knie_alltag_links, knie_alltag_rechts, schulter_links, schulter_rechts, ruecken, ellenbogen, schlaf_h, hrv_rmssd_ms, gewicht_kg, notiz, ruhepuls_bpm, alkohol_drinks, krank, symptome, handball_belastung, spielminuten, wurfvolumen, kaffee, letzter_kaffee_uhrzeit, energie_mittag, trainingslast_au, schema_version`.
-- Herkunft: Schmerzen morgens aus dem Morgen-Check; `knie_alltag` aus dem Abend-Check; `knie_belastung` = höchster Wert der Einheiten des Tages; `schlaf_h` = Nacht, die am Morgen des Tages endet; `hrv_rmssd_ms` nur aus dem Zepp-Feld (RMSSD), nie SDNN; `krank` = 1 schon bei leichten Anzeichen, Details in `symptome` (mit `;` getrennt); `handball_belastung` aus dem höchsten Handball-RPE (bis 4 leicht, 5–6 mittel, ab 7 hart); `wurfvolumen` = höchste Stufe des Tages; `kaffee` 0/1, die Uhrzeit nur bei 1; `trainingslast_au` = Summe RPE × Minuten der Einheiten mit RPE; `notiz` = Notizen von morgens, abends und aus den Einheiten, mit „ | “ getrennt.
+- Spalten: `datum, knie_morgen_links, knie_morgen_rechts, knie_belastung_links, knie_belastung_rechts, knie_alltag_links, knie_alltag_rechts, schulter_links, schulter_rechts, ruecken, ellenbogen, schlaf_h, hrv_rmssd_ms, gewicht_kg, notiz, ruhepuls_bpm, alkohol_drinks, krank, symptome, handball_belastung, spielminuten, wurfvolumen, kaffee, letzter_kaffee_uhrzeit, energie_mittag, trainingslast_au, schema_version, fieber, symptome_zeit, knie_rote_flagge, knie_rote_flagge_art, einheit_1, minuten_1, rpe_1, einheit_2, minuten_2, rpe_2, einheit_3, minuten_3, rpe_3, kaffee_tassen, stehen_sitzen_lang, muskelkater` – bei mehr als 3 Einheiten an einem Tag ganz hinten zusätzlich `einheit_4, minuten_4, rpe_4` usw.
+- Herkunft: Schmerzen morgens aus dem Morgen-Check; `knie_alltag` aus dem Abend-Check; `knie_belastung` = höchster Wert der Einheiten des Tages; `schlaf_h` = Nacht, die am Morgen des Tages endet; `hrv_rmssd_ms` nur aus dem Zepp-Feld (RMSSD), nie SDNN; `krank` = 1 schon bei leichten Anzeichen, Details in `symptome` (mit `;` getrennt); `handball_belastung` aus dem höchsten Handball-RPE (bis 4 leicht, 5–6 mittel, ab 7 hart); `wurfvolumen` = höchste Stufe des Tages; `kaffee` 0/1, die Uhrzeit nur bei 1; `trainingslast_au` = Summe RPE × Minuten der Einheiten mit RPE; `notiz` = Notizen von morgens, abends und aus den Einheiten, mit „ | “ getrennt; `fieber` = 1, wenn bei den Symptomen „Fieber“ angekreuzt ist (0 bei keinen Krankheitszeichen); `knie_rote_flagge_art` mit `;` getrennt; `einheit_n/minuten_n/rpe_n` = Einheiten des Tages nach Startzeit, auch Workouts aus Apple Health ohne Eintrag (dann nur Minuten); ältere Einträge ohne Plan-Einheit: Handball/Spiel/Sonstiges abgeleitet, Gym leer; `kaffee_tassen` = Anzahl Koffein-Getränke, `kaffee` daraus 0/1 (vorher ja/nein); `muskelkater` = 0–6, höher = stärker (in der App 1–7 mit 7 = keiner).
 - **Ablage:** Die Datei wird einmal über die Dateien-App verknüpft (z. B. in einem Cloud-Ordner der Trainingsplanung) und danach nach jedem gespeicherten Check-in, jeder Einheit und beim Öffnen überschrieben. Auf dem Gerät mit Google Drive geprüft: Die verknüpfte Datei wird zuverlässig überschrieben. Als Rückfall gibt es „Datei teilen“.
 
 **Export (Wochenbericht, geplant):** `weekly_report_<YYYY>-W<ww>.json` (versioniert) und `.md` (kompakte Zusammenfassung ohne Interpretation).

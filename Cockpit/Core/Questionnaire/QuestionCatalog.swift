@@ -44,10 +44,12 @@ nonisolated enum QuestionCondition: Sendable, Equatable {
     case yes(String)
     /// The choice question was answered with something other than the given index.
     case choiceNot(String, Int)
+    /// The count question was answered with more than the given number.
+    case countAbove(String, Int)
 
     var parentID: String {
         switch self {
-        case .yes(let id), .choiceNot(let id, _): id
+        case .yes(let id), .choiceNot(let id, _), .countAbove(let id, _): id
         }
     }
 }
@@ -72,8 +74,17 @@ nonisolated struct Question: Sendable, Identifiable, Equatable {
 /// - 1: first catalog.
 /// - 2: evening knee (`pain_knee_*_evening`) replaced by knee in everyday life (`knee_daily_*`),
 ///      symptoms after illness, energy at noon (`energy_midday`, own phase).
+/// - 3: evening: caffeine as number of drinks (`caffeine_drinks`, replaces `caffeine_today`),
+///      symptom timing, knee red flags, long standing/sitting.
 nonisolated enum QuestionCatalog {
-    static let version = 2
+    static let version = 3
+
+    /// Knee red flags. Titles for the app; `redFlagExportKeys` (same order) for the export.
+    static let redFlags = ["Wegknicken", "Instabil", "Schwellung", "Drehschmerz", "Blockade", "Kniescheibe", "Nachtschmerz"]
+    static let redFlagExportKeys = ["wegknicken", "instabil", "schwellung", "drehschmerz", "blockade", "kniescheibe", "nachtschmerz"]
+
+    /// Symptom timing; the option texts are also the export values.
+    static let symptomTimes = ["keine", "morgens", "ganztags"]
 
     static let painRegions: [(id: String, title: String)] = [
         ("knee_left", "Knie links"),
@@ -122,22 +133,33 @@ nonisolated enum QuestionCatalog {
         Question(id: "knee_daily_left", phase: .evening, section: "Knie im Alltag", title: "Knie links", kind: .pain,
                  hint: "Beim Gehen, Treppensteigen, Sitzen – ohne Training"),
         Question(id: "knee_daily_right", phase: .evening, section: "Knie im Alltag", title: "Knie rechts", kind: .pain),
+        Question(id: "knee_red_flag", phase: .evening, section: "Knie im Alltag", title: "Warnzeichen am Knie heute",
+                 kind: .yesNo, hint: "Wegknicken, Instabilität, Schwellung, Drehschmerz, Blockade, Kniescheibe, Nachtschmerz"),
+        Question(id: "knee_red_flag_types", phase: .evening, section: "Knie im Alltag", title: "Welche Warnzeichen",
+                 kind: .multiChoice(redFlags), shownIf: .yes("knee_red_flag")),
     ] + painRegions.filter { !$0.id.hasPrefix("knee") }.map { region in
         Question(id: "pain_\(region.id)_evening", phase: .evening, section: "Beschwerden abends", title: region.title, kind: .pain)
     } + [
+        Question(id: "symptoms_time", phase: .evening, section: "Beschwerden abends", title: "Krankheitssymptome heute",
+                 kind: .choice(symptomTimes)),
+        Question(id: "long_static_posture", phase: .evening, section: "Alltag", title: "Lange gestanden oder gesessen",
+                 kind: .yesNo, hint: "Mehr als 2 Stunden am Stück"),
         Question(id: "food_amount", phase: .evening, section: "Ernährung", title: "Gegessen",
                  kind: .choice(["zu wenig", "passt", "zu viel"])),
         Question(id: "protein_ok", phase: .evening, section: "Ernährung", title: "Genug Eiweiß", kind: .yesNo),
-        Question(id: "caffeine_today", phase: .evening, section: "Ernährung", title: "Koffein heute", kind: .yesNo),
+        Question(id: "caffeine_drinks", phase: .evening, section: "Ernährung", title: "Koffein-Getränke",
+                 kind: .count(one: "Getränk", many: "Getränke", range: 0...15,
+                              noneLabel: "Kein Koffein", someLabel: "Koffein getrunken"),
+                 hint: "Kaffee, Espresso, Energy, Cola, schwarzer Tee: je 1"),
         Question(id: "last_caffeine_time", phase: .evening, section: "Ernährung", title: "Letztes Koffein um",
-                 kind: .time, shownIf: .yes("caffeine_today")),
+                 kind: .time, shownIf: .countAbove("caffeine_drinks", 0)),
         Question(id: "alcohol_drinks", phase: .evening, section: "Ernährung", title: "Alkohol",
                  kind: .count(one: "Drink", many: "Drinks", range: 0...20,
                               noneLabel: "Kein Alkohol", someLabel: "Alkohol getrunken")),
     ]
 
     /// IDs of earlier versions that are no longer asked. Their stored answers are kept as they are.
-    static let retiredIDs: Set<String> = ["pain_knee_left_evening", "pain_knee_right_evening"]
+    static let retiredIDs: Set<String> = ["pain_knee_left_evening", "pain_knee_right_evening", "caffeine_today"]
 
     /// Verbal anchors of the 0–10 pain scale.
     static func painLabel(_ value: Int) -> String {
@@ -166,6 +188,7 @@ nonisolated enum QuestionCatalog {
         case nil: true
         case .yes(let parent): answers[parent]?.boolValue == true
         case .choiceNot(let parent, let index): answers[parent]?.intValue.map { $0 != index } ?? false
+        case .countAbove(let parent, let limit): answers[parent]?.intValue.map { $0 > limit } ?? false
         }
     }
 

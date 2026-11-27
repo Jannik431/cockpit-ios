@@ -23,14 +23,14 @@ struct CSVExportTests {
     @Test func headerStartsWithRequiredColumnsInOrder() {
         let header = lines([])[0]
         #expect(header.hasPrefix("datum,knie_morgen_links,knie_morgen_rechts,knie_belastung_links,knie_belastung_rechts,knie_alltag_links,knie_alltag_rechts,schulter_links,schulter_rechts,ruecken,ellenbogen,schlaf_h,hrv_rmssd_ms,gewicht_kg,notiz"))
-        #expect(header.hasSuffix("schema_version"))
+        #expect(header.contains(",schema_version,"))
     }
 
     @Test func emptyDayHasOnlyDateAndVersion() {
         let row = lines([ExportDay(day: day)])[1]
         #expect(row.hasPrefix("2026-11-24,"))
         #expect(row.split(separator: ",", omittingEmptySubsequences: false).count == CSVExport.columns.count)
-        #expect(row.hasSuffix(",1"))
+        #expect(CSVExport.row(for: ExportDay(day: day), calendar: berlin) == ["datum": "2026-11-24", "schema_version": "1"])
         #expect(!row.contains(",0,"))
     }
 
@@ -90,6 +90,71 @@ struct CSVExportTests {
         export.evening = ["caffeine_today": .bool(false)]
         #expect(value("kaffee", in: export) == "0")
         #expect(value("letzter_kaffee_uhrzeit", in: export) == nil)
+    }
+
+    @Test func newColumnsAreAppendedAfterSchemaVersion() {
+        let header = lines([])[0].split(separator: ",").map(String.init)
+        let version = header.firstIndex(of: "schema_version")!
+        #expect(Array(header[(version + 1)...]) == [
+            "fieber", "symptome_zeit", "knie_rote_flagge", "knie_rote_flagge_art",
+            "einheit_1", "minuten_1", "rpe_1", "einheit_2", "minuten_2", "rpe_2", "einheit_3", "minuten_3", "rpe_3",
+            "kaffee_tassen", "stehen_sitzen_lang", "muskelkater",
+        ])
+    }
+
+    @Test func feverSymptomTimingRedFlagsPostureAndSoreness() {
+        var export = ExportDay(day: day)
+        export.morning = ["illness": .int(2), "symptoms": .list([0, 3]), "muscle_soreness": .int(5)]
+        export.evening = ["symptoms_time": .int(2), "knee_red_flag": .bool(true), "knee_red_flag_types": .list([0, 6]),
+                          "long_static_posture": .bool(true), "caffeine_drinks": .int(3), "last_caffeine_time": .time(14 * 60)]
+        #expect(value("fieber", in: export) == "1")
+        #expect(value("symptome_zeit", in: export) == "ganztags")
+        #expect(value("knie_rote_flagge", in: export) == "1")
+        #expect(value("knie_rote_flagge_art", in: export) == "wegknicken;nachtschmerz")
+        #expect(value("stehen_sitzen_lang", in: export) == "1")
+        #expect(value("muskelkater", in: export) == "2")
+        #expect(value("kaffee_tassen", in: export) == "3")
+        #expect(value("kaffee", in: export) == "1")
+        #expect(value("letzter_kaffee_uhrzeit", in: export) == "14:00")
+
+        export.morning = ["illness": .int(0), "muscle_soreness": .int(7)]
+        export.evening = ["knee_red_flag": .bool(false), "caffeine_drinks": .int(0), "last_caffeine_time": .time(9 * 60)]
+        #expect(value("fieber", in: export) == "0")
+        #expect(value("muskelkater", in: export) == "0")
+        #expect(value("knie_rote_flagge", in: export) == "0")
+        #expect(value("knie_rote_flagge_art", in: export) == nil)
+        #expect(value("kaffee", in: export) == "0")
+        #expect(value("letzter_kaffee_uhrzeit", in: export) == nil)
+    }
+
+    @Test func sessionsFillUnitColumnsInOrderAndAddGroupsBeyondThree() {
+        var export = ExportDay(day: day)
+        export.sessions = [
+            ExportSession(kind: .gym, rpe: 6, durationMin: 60, planUnit: "A-moderat"),
+            ExportSession(kind: .handball, rpe: nil, durationMin: 85),
+            ExportSession(kind: .handball, rpe: 8, durationMin: 70, planUnit: "Spiel"),
+            ExportSession(kind: .other, rpe: 3, durationMin: 20, planUnit: "Sonstiges"),
+        ]
+        #expect(value("einheit_1", in: export) == "A-moderat")
+        #expect(value("minuten_1", in: export) == "60")
+        #expect(value("rpe_1", in: export) == "6")
+        #expect(value("einheit_2", in: export) == nil)
+        #expect(value("minuten_2", in: export) == "85")
+        #expect(value("rpe_2", in: export) == nil)
+        #expect(value("einheit_3", in: export) == "Spiel")
+
+        let csv = lines([export, ExportDay(day: berlin.date(byAdding: .day, value: -1, to: day)!)])
+        #expect(csv[0].hasSuffix(",einheit_4,minuten_4,rpe_4"))
+        #expect(csv[2].hasSuffix(",Sonstiges,20,3"))
+        #expect(csv[1].split(separator: ",", omittingEmptySubsequences: false).count == csv[0].split(separator: ",").count)
+    }
+
+    @Test func olderCaffeineAnswerStillExported() {
+        var export = ExportDay(day: day)
+        export.evening = ["caffeine_today": .bool(true), "last_caffeine_time": .time(13 * 60)]
+        #expect(value("kaffee", in: export) == "1")
+        #expect(value("kaffee_tassen", in: export) == nil)
+        #expect(value("letzter_kaffee_uhrzeit", in: export) == "13:00")
     }
 
     @Test func handballBandThresholds() {

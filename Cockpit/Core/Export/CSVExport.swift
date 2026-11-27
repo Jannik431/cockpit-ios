@@ -21,6 +21,8 @@ nonisolated struct ExportSession: Sendable {
     var kneePainLeft: Int?
     var kneePainRight: Int?
     var minutesPlayed: Int?
+    /// Unit from the training plan, e.g. "A" or "Spiel"; `nil` if unknown.
+    var planUnit: String?
 }
 
 /// The daily CSV read by the training planning (spec, section 7).
@@ -42,13 +44,34 @@ nonisolated enum CSVExport {
         "handball_belastung", "spielminuten", "wurfvolumen",
         "kaffee", "letzter_kaffee_uhrzeit", "energie_mittag",
         "trainingslast_au", "schema_version",
+        // Added later (append only):
+        "fieber", "symptome_zeit", "knie_rote_flagge", "knie_rote_flagge_art",
+        "einheit_1", "minuten_1", "rpe_1",
+        "einheit_2", "minuten_2", "rpe_2",
+        "einheit_3", "minuten_3", "rpe_3",
+        "kaffee_tassen", "stehen_sitzen_lang", "muskelkater",
     ]
 
+    /// Session columns that always exist; days with more sessions add further groups at the very end.
+    static let fixedSessionGroups = 3
+
+    static func sessionColumns(_ number: Int) -> [String] {
+        ["einheit_\(number)", "minuten_\(number)", "rpe_\(number)"]
+    }
+
+    /// `columns` plus extra session groups if any day has more than three sessions.
+    static func columns(for days: [ExportDay]) -> [String] {
+        let most = days.map(\.sessions.count).max() ?? 0
+        guard most > fixedSessionGroups else { return columns }
+        return columns + ((fixedSessionGroups + 1)...most).flatMap(sessionColumns)
+    }
+
     static func csv(days: [ExportDay], calendar: Calendar = .current) -> String {
-        var lines = [columns.joined(separator: ",")]
+        let header = columns(for: days)
+        var lines = [header.joined(separator: ",")]
         for day in days.sorted(by: { $0.day < $1.day }) {
             let values = row(for: day, calendar: calendar)
-            lines.append(columns.map { escape(values[$0] ?? "") }.joined(separator: ","))
+            lines.append(header.map { escape(values[$0] ?? "") }.joined(separator: ","))
         }
         return lines.joined(separator: "\n") + "\n"
     }
@@ -93,11 +116,15 @@ nonisolated enum CSVExport {
 
         // Evening.
         row["alkohol_drinks"] = int(day.evening, "alcohol_drinks")
-        if let caffeine = day.evening["caffeine_today"]?.boolValue {
+        // Caffeine: number of drinks since catalog v3, before that only yes/no.
+        if let drinks = day.evening["caffeine_drinks"]?.intValue {
+            row["kaffee_tassen"] = "\(drinks)"
+            row["kaffee"] = drinks > 0 ? "1" : "0"
+        } else if let caffeine = day.evening["caffeine_today"]?.boolValue {
             row["kaffee"] = caffeine ? "1" : "0"
-            if caffeine, let minutes = day.evening["last_caffeine_time"]?.minutes {
-                row["letzter_kaffee_uhrzeit"] = String(format: "%02d:%02d", minutes / 60, minutes % 60)
-            }
+        }
+        if row["kaffee"] == "1", let minutes = day.evening["last_caffeine_time"]?.minutes {
+            row["letzter_kaffee_uhrzeit"] = String(format: "%02d:%02d", minutes / 60, minutes % 60)
         }
         row["energie_mittag"] = int(day.midday, "energy_midday")
 
@@ -113,6 +140,43 @@ nonisolated enum CSVExport {
         // Session load (Foster): sum of RPE × minutes over sessions with an RPE.
         let loads = day.sessions.compactMap { session in session.rpe.map { $0 * session.durationMin } }
         row["trainingslast_au"] = loads.isEmpty ? nil : "\(loads.reduce(0, +))"
+
+        // Sessions in order of start: plan unit, minutes, RPE.
+        for (index, session) in day.sessions.enumerated() {
+            let columns = sessionColumns(index + 1)
+            row[columns[0]] = session.planUnit
+            row[columns[1]] = "\(session.durationMin)"
+            row[columns[2]] = session.rpe.map(String.init)
+        }
+
+        // Fever: from the symptoms of the morning check; 0 if no illness or fever not ticked.
+        if let illness = day.morning["illness"]?.intValue {
+            let feverIndex = QuestionCatalog.symptoms.firstIndex(of: "Fieber")
+            let ticked = day.morning["symptoms"]?.listValue ?? []
+            row["fieber"] = illness > 0 && feverIndex.map(ticked.contains) == true ? "1" : "0"
+        }
+        if let index = day.evening["symptoms_time"]?.intValue, QuestionCatalog.symptomTimes.indices.contains(index) {
+            row["symptome_zeit"] = QuestionCatalog.symptomTimes[index]
+        }
+
+        // Knee red flags (evening).
+        if let flag = day.evening["knee_red_flag"]?.boolValue {
+            row["knie_rote_flagge"] = flag ? "1" : "0"
+            if flag, let indices = day.evening["knee_red_flag_types"]?.listValue, !indices.isEmpty {
+                row["knie_rote_flagge_art"] = indices
+                    .compactMap { QuestionCatalog.redFlagExportKeys.indices.contains($0) ? QuestionCatalog.redFlagExportKeys[$0] : nil }
+                    .joined(separator: ";")
+            }
+        }
+
+        if let posture = day.evening["long_static_posture"]?.boolValue {
+            row["stehen_sitzen_lang"] = posture ? "1" : "0"
+        }
+
+        // Muscle soreness: the app scale is 1–7 with 7 = none; exported as 0–6 with higher = stronger.
+        if let soreness = day.morning["muscle_soreness"]?.intValue {
+            row["muskelkater"] = "\(7 - soreness)"
+        }
 
         return row.compactMapValues { $0 }
     }

@@ -30,6 +30,35 @@ struct OptionButtons: View {
     }
 }
 
+/// Grid for single choice with many short options, e.g. plan units. Tapping the selected option clears it.
+struct ChoiceGrid: View {
+    let options: [String]
+    @Binding var selection: Int?
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 6)], spacing: 6) {
+            ForEach(options.indices, id: \.self) { index in
+                let selected = selection == index
+                Button {
+                    selection = selected ? nil : index
+                } label: {
+                    Text(options[index])
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .foregroundStyle(selected ? Color.white : Color.primary)
+                        .background(selected ? Color.accentColor : Color(uiColor: .tertiarySystemFill),
+                                    in: .rect(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 /// Grid of toggles for multiple choice.
 struct MultiChoiceButtons: View {
     let options: [String]

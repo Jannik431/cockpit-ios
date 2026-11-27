@@ -68,6 +68,7 @@ struct ExportView: View {
                 Text("schlaf_h ist die Nacht, die am Morgen dieses Tages endet. hrv_rmssd_ms kommt nur aus dem Zepp-Feld (RMSSD), nie aus Apple Health.")
                 Text("knie_belastung = höchster Wert der Einheiten des Tages. handball_belastung aus dem RPE: bis 4 leicht, 5–6 mittel, ab 7 hart. trainingslast_au = Summe RPE × Minuten der Einheiten mit RPE.")
                 Text("krank = 1 schon bei leichten Anzeichen. kaffee = 0/1, die Uhrzeit nur bei 1.")
+                Text("einheit_n/minuten_n/rpe_n = Einheiten des Tages nach Startzeit (ab der 4. Einheit hinten angehängt). muskelkater = 0–6, höher = stärker. fieber aus den Symptomen. kaffee_tassen = alle Koffein-Getränke.")
             }
             .font(.footnote)
             .foregroundStyle(.secondary)

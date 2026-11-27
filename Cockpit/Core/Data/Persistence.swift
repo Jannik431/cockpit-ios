@@ -1,12 +1,14 @@
 import Foundation
 import SwiftData
 
-/// Current schema. Every model change needs a new `VersionedSchema`, a frozen copy of the old models
-/// (see `CockpitSchemaV1`) and a migration stage, because questionnaire answers and session RPE cannot be re-imported.
+/// Current schema. Every model change needs a new `VersionedSchema`, a frozen copy of the changed models
+/// (see `CockpitSchemaV1`, `CockpitSchemaV2`) and a migration stage, because questionnaire answers and
+/// session RPE cannot be re-imported.
 ///
 /// - V2: `HealthWorkout.isHidden`; `CompletedSession.kneePainLeft/Right`, `minutesPlayed`.
-enum CockpitSchemaV2: VersionedSchema {
-    static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
+/// - V3: `CompletedSession.planUnit`.
+enum CockpitSchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [DailyMetrics.self, HealthWorkout.self, QuestionnaireEntry.self, CompletedSession.self]
@@ -14,10 +16,13 @@ enum CockpitSchemaV2: VersionedSchema {
 }
 
 enum CockpitMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [CockpitSchemaV1.self, CockpitSchemaV2.self] }
+    static var schemas: [any VersionedSchema.Type] { [CockpitSchemaV1.self, CockpitSchemaV2.self, CockpitSchemaV3.self] }
 
     static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: CockpitSchemaV1.self, toVersion: CockpitSchemaV2.self)]
+        [
+            .lightweight(fromVersion: CockpitSchemaV1.self, toVersion: CockpitSchemaV2.self),
+            .lightweight(fromVersion: CockpitSchemaV2.self, toVersion: CockpitSchemaV3.self),
+        ]
     }
 }
 
@@ -26,7 +31,7 @@ enum Persistence {
 
     static let container: ModelContainer = makeContainer()
 
-    static var currentSchema: Schema { Schema(versionedSchema: CockpitSchemaV2.self) }
+    static var currentSchema: Schema { Schema(versionedSchema: CockpitSchemaV3.self) }
 
     private static func makeContainer() -> ModelContainer {
         let schema = currentSchema
@@ -60,7 +65,7 @@ enum Persistence {
     /// Copies the existing store once per schema version before SwiftData migrates it,
     /// to `Application Support/Backups/before-schema-<version>/`. Never overwritten, never deleted automatically.
     private static func backUpBeforeMigration(storeURL: URL) {
-        let version = CockpitSchemaV2.versionIdentifier
+        let version = CockpitSchemaV3.versionIdentifier
         let key = "backupBeforeSchema\(version.major)"
         let fileManager = FileManager.default
         guard !UserDefaults.standard.bool(forKey: key), fileManager.fileExists(atPath: storeURL.path) else { return }

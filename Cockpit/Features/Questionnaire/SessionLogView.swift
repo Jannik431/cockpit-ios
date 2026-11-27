@@ -15,6 +15,7 @@ struct SessionLogView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var kind: SessionKind = .gym
+    @State private var planUnit: String?
     @State private var start = Date.now
     @State private var durationMin = 60
     @State private var rpe: Int?
@@ -32,10 +33,10 @@ struct SessionLogView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Einheit") {
-                    OptionButtons(options: SessionKind.allCases.map(\.title), selection: Binding(
-                        get: { SessionKind.allCases.firstIndex(of: kind) },
-                        set: { kind = $0.map { SessionKind.allCases[$0] } ?? kind }
+                Section {
+                    ChoiceGrid(options: SessionScales.planUnits, selection: Binding(
+                        get: { planUnit.flatMap { SessionScales.planUnits.firstIndex(of: $0) } },
+                        set: { index in selectPlanUnit(index.map { SessionScales.planUnits[$0] }) }
                     ))
                     if fromHealth {
                         LabeledContent("Zeit", value: MetricsFormat.timeRange(start, start.addingTimeInterval(Double(durationMin) * 60)))
@@ -43,6 +44,12 @@ struct SessionLogView: View {
                         DatePicker("Beginn", selection: $start, displayedComponents: .hourAndMinute)
                     }
                     Stepper("Dauer: \(durationMin) min", value: $durationMin, in: 5...300, step: 5)
+                } header: {
+                    Text("Einheit laut Plan")
+                } footer: {
+                    if planUnit == nil {
+                        Text("Bitte die Einheit aus dem Plan wählen. Erkannt: \(kind.title).")
+                    }
                 }
 
                 Section {
@@ -83,7 +90,6 @@ struct SessionLogView: View {
 
                 if kind == .handball {
                     Section("Handball") {
-                        OptionButtons(options: ["Training", "Spiel"], selection: $matchIndex)
                         if matchIndex == 1 {
                             Stepper(value: Binding(get: { minutesPlayed ?? 0 }, set: { minutesPlayed = $0 }), in: 0...120, step: 5) {
                                 LabeledContent("Spielminuten", value: minutesPlayed.map { "\($0) min" } ?? "nicht angegeben")
@@ -145,6 +151,7 @@ struct SessionLogView: View {
         loaded = true
         if let existing = draft.existing {
             kind = existing.sessionKind
+            planUnit = existing.effectivePlanUnit
             start = existing.start
             durationMin = existing.durationMin
             rpe = existing.sessionRPE
@@ -156,6 +163,8 @@ struct SessionLogView: View {
             note = existing.note ?? ""
         } else if let suggested = draft.suggested {
             kind = suggested.kind
+            // Handball is detected reliably; gym units (A–D, Plyo2) have to be picked.
+            if suggested.kind == .handball { selectPlanUnit("Handball") }
             start = suggested.start
             durationMin = max(5, Int(suggested.activeMinutes.rounded()))
         } else if Calendar.current.isDate(draft.day, inSameDayAs: .now) {
@@ -165,6 +174,18 @@ struct SessionLogView: View {
         } else {
             // A past day: default to the evening of that day.
             start = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: draft.day) ?? draft.day
+        }
+    }
+
+    /// The plan unit decides the kind and, for handball, match or practice.
+    private func selectPlanUnit(_ unit: String?) {
+        planUnit = unit
+        guard let unit else { return }
+        kind = SessionScales.kind(forPlanUnit: unit)
+        switch unit {
+        case "Spiel": matchIndex = 1
+        case "Handball": matchIndex = 0
+        default: matchIndex = nil
         }
     }
 
@@ -208,6 +229,7 @@ struct SessionLogView: View {
             return new
         }()
         session.kind = kind.rawValue
+        session.planUnit = planUnit
         session.start = start
         session.end = draft.suggested?.end ?? end
         session.durationMin = durationMin

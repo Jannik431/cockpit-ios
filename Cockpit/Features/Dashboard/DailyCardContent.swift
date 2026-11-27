@@ -512,8 +512,12 @@ private struct TrainingCard: View {
     }
 
     private func title(_ row: TrainingRow) -> String {
-        guard row.kind == .handball, let isMatch = row.log?.isMatch else { return row.kind.title }
-        return isMatch ? "Handball · Spiel" : "Handball · Training"
+        switch row.log?.effectivePlanUnit {
+        case "Spiel": "Handball · Spiel"
+        case "Handball": "Handball · Training"
+        case "Sonstiges", nil: row.kind.title
+        case let unit?: "Gym · Einheit \(unit)"
+        }
     }
 
     private func subtitle(_ row: TrainingRow) -> String {
