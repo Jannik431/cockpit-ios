@@ -1,14 +1,18 @@
 import SwiftData
 import SwiftUI
-import UserNotifications
 
 @main
 struct CockpitApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    init() {
+        // As early as possible: a tap that launches the app is delivered right after launch.
+        NotificationRouter.shared.install()
+    }
+
     var body: some Scene {
         WindowGroup {
-            DashboardView()
+            RootView()
         }
         .modelContainer(Persistence.container)
     }
@@ -19,7 +23,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+        NotificationRouter.shared.install()
         ReminderCenter.shared.registerCategories()
         HealthBackgroundObserver.shared.start()
         return true
